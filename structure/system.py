@@ -72,7 +72,7 @@ class System:
                     if isinstance(ligands, list):
                         i = 0
                         for ligand in ligands:
-                            self.ligands.append(Ligand(structure=ligand, model=models[i], ignh=ignh))
+                            self.ligands.append(Ligand(structure=ligand, model=models[i], name=os.path.splitext(os.path.basename(ligand))[0], ignh=ignh))
                             i += 1
                     if isinstance(ligands, str):
                         self.ligands.append(Ligand(structure=ligands, model=models[0], ignh=ignh))
@@ -97,6 +97,24 @@ class System:
     ######################################################################################
     ######################## Interaction Matrices Functions ##############################
     ######################################################################################
+    @staticmethod
+    def euclideanDistance(x, y):
+        try:
+            assert len(x) == len(y)
+        except:
+            raise ValueError('X and Y must be of equal length')
+        return np.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
+
+    @staticmethod
+    def rmsd(x, y):
+        try:
+            assert len(x) == len(y)
+        except:
+            raise ValueError('X and Y must be of equal length')
+        total_squared_distance = 0
+        for i in range(0, len(x)):
+            total_squared_distance += (x[i][0] - y[i][0])**2 + (x[i][1] - y[i][1])**2 + (x[i][2] - y[i][2])**2
+        return np.sqrt(total_squared_distance / len(x))   
 
     def interactions(self, distance=5, norm=False, heavy=False, to_csv=None):
         '''
@@ -116,8 +134,8 @@ class System:
             num_interactions = 0
             for res_id in self.protein.ids:
                 res_com = self.protein.coms[res_id]
-                for coord in ligand.coordinates:
-                    d = np.sqrt((coord[0] - res_com[0])**2 + (coord[1] - res_com[1])**2 + (coord[2] - res_com[2])**2)
+                for atom in ligand.atoms:
+                    d = np.sqrt((atom.coordinates[0] - res_com[0])**2 + (atom.coordinates[1] - res_com[1])**2 + (atom.coordinates[2] - res_com[2])**2)
                     if d <= distance:
                         num_interactions += 1
                 interactions[ligand.name][res_id] = num_interactions
@@ -189,6 +207,34 @@ class System:
         if to_csv is not None:
             df.to_csv(to_csv)
         return df
+
+    def minimumDistanceByAtom(self):
+        '''
+        Gets minimum distance by atom. Creates an attribute of ligand containing minimum distance matrix. 
+        '''
+        for ligand in self.ligands:
+            mindist = {}
+            for residue in self.protein.residues:
+                mindist[residue.id] = {}
+                d = None
+                protein_atom_name = None
+                ligand_atom_name = None
+                for protein_atom in residue.atoms:
+                    for ligand_atom in ligand.atoms:
+                        _d = self.euclideanDistance(protein_atom.coordinates, ligand_atom.coordinates)
+                        if d is None:
+                            d = _d
+                            protein_atom_name = protein_atom.name
+                            ligand_atom_name = ligand_atom.name
+                        if (d > _d):
+                            d = _d
+                            protein_atom_name = protein_atom.name
+                            ligand_atom_name = ligand_atom.name
+                mindist[residue.id]['distance'] = d 
+                mindist[residue.id]['protein_atom'] = protein_atom_name
+                mindist[residue.id]['ligand_atom'] = ligand_atom_name
+            df = pd.DataFrame(mindist).T
+            ligand.minimum_distance = df
 
     def averageDistance(self, to_csv=None):
         '''
@@ -271,6 +317,27 @@ class System:
             percent = (value / num_residues) * 100
             percents.append(percent)
         df['%'] = percents
+        if to_csv is not None:
+            df.to_csv(to_csv)
+        return df
+
+    def interactionFrequency(self, distance=5, heavy=True, to_csv=None):
+        interactions = {}
+        for res_id in self.protein.ids:
+            residue_coordinates = self.protein.coordinates[res_id]
+            interactions[res_id] = {}
+            for ligand in self.ligands:
+                interactions[res_id][ligand.name] = 0
+                for residue_coordinate in residue_coordinates:
+                    for atom in ligand.atoms:
+                        if (heavy is True) and (atom.type == 'H'):
+                            continue
+                        d = np.sqrt((atom.coordinates[0] - residue_coordinate[0])**2 + (atom.coordinates[1] - residue_coordinate[1])**2 + (atom.coordinates[2] - residue_coordinate[2])**2)
+                        if d <= 5:
+                            interactions[res_id][ligand.name] +=1
+                atom_count = ligand.atomCount(heavy=heavy)
+                interactions[res_id][ligand.name] = interactions[res_id][ligand.name] / atom_count
+        df = pd.DataFrame(interactions)
         if to_csv is not None:
             df.to_csv(to_csv)
         return df
@@ -366,6 +433,7 @@ class System:
         drug_standards = {}
         for report in all_contents:
             drug_id = report[0].strip()
+            print(drug_id)
             if drug_id == '':
                 drug_id = report[2].strip()
             # if drug_id not in self.names:
@@ -535,6 +603,7 @@ class System:
         properties['Standard'] = drug_standards
         # self.properties = properties
         df = pd.DataFrame.from_dict(properties)
+
         return df
 
     def qikpropScreen(self, csv=None):

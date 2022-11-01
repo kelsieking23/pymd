@@ -21,7 +21,7 @@ from pymd.utilities.rewritepdb import editChainIDResidue
 
 class PostProcess:
 
-    def __init__(self, system=None):
+    def __init__(self, system=None, tu='ns'):
         if system is not None:
             self.system = system
             # self.directory = self.system.directory
@@ -31,7 +31,8 @@ class PostProcess:
             self.directory = None
             self.protein = None
             self.peptides = None
-
+        self.tu = tu
+        self.data = {}
 
 
     @property
@@ -89,7 +90,10 @@ class PostProcess:
                     else:
                         break
                     i += 1
-            data = pd.read_csv(filename, delim_whitespace=True, header=None, skiprows=skiprows, index_col=0)
+            if filename.endswith('xvg'):
+                data = pd.read_csv(filename, delim_whitespace=True, header=None, skiprows=skiprows, index_col=0)
+            else:
+                data = pd.read_csv(filename, header=0, index_col=0)
             metadata = self.metadata(filename, df = data).attrs
             if select == -1:
                 if metadata['s_list'] != []:
@@ -97,9 +101,9 @@ class PostProcess:
                 for column in data.columns:
                     if column in df.columns:
                         k = 1
-                        _col = column + '_{}'.format(k)
+                        _col = str(column) + '_{}'.format(str(k))
                         while _col in df.columns:
-                            _col = column + '_{}'.format(k)
+                            _col = str(column) + '_{}'.format((str(k)))
                             k += 1
                         df[_col] = data[column]
                     else:
@@ -116,10 +120,50 @@ class PostProcess:
             name = name + filename + ' '
         df.name = name
         df = self.metadata(*args, df=df)
+        self.data = df.attrs
         if convert is True:
             df.index = df.index / 1000
             df.attrs['x_label'] = 'Time (ns)'
         return df
+
+    def remapData(self, df, pdb):
+        f = open(pdb, 'r')
+        chains = {}
+        for line in f:
+            if not line.startswith('ATOM'):
+                continue
+            if 'SOL' in line:
+                break
+            chainid = line.split()[4]
+            resnum = line.split()[5]
+            if not chainid in chains.keys():
+                chains[chainid] = []
+            if resnum not in chains[chainid]:
+                chains[chainid].append(resnum)
+        f.close()
+        for chainid in chains.keys():
+            print(chainid, chains[chainid])
+            # print(df.loc[chains[chainid],:])
+
+    def timeAverage(self, df, interval=200):
+        '''
+        parameters:
+        df (dataframe)
+        interval (int, default=200): interval for averages
+        '''
+        try:
+            assert isinstance(interval, int)
+        except:
+            raise ValueError('Interval must be integer. Input {} cannot be interpreted as integer'.format(interval))
+        end = int(df.index[-1])
+        start = int(df.index[0])
+        mean = pd.DataFrame()
+        sd = pd.DataFrame()
+        for i in range(start, end, interval):
+            mean['{}-{} {}'.format(i,i+interval, self.tu)] = df.loc[i:i+interval, :].mean()
+            sd['{}-{} {}-std'.format(i,i+interval, self.tu)] = df.loc[i:i+interval, :].std()
+        data = pd.concat([mean, sd], axis=1)
+        return data
 
     @staticmethod
     def metadata(*args, df):

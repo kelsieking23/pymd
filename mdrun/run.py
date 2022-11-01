@@ -2,7 +2,10 @@ import os
 import sys
 import multiprocessing as mp
 import pymd
-from pymd.mdrun.runfunc import pbc, rmsd
+from pymd.mdrun.runfunc import pbc, rmsd, rmsf
+from pymd.mdanalysis.cluster import Cluster
+from pymd.mdanalysis.analysis import Analysis
+from pymd.mdanalysis.dist import Distance
 from pymd.mdrun.gmx import GMX
 import time
 DIRECTORY = pymd.dir_path
@@ -93,6 +96,99 @@ class Run:
             # print(end-start)
         # self.system.update(results)
         return self.system
+
+    def rmsf(self, inp, top='system', job_name='rmsf', output='rmsf.xvg', res=True, selections=('backbone'), reference_index=0, parallel=True):
+        self.system.job_params = {'inp':inp,'top':top,'output':output, 'selections':selections,
+                                'reference_index':reference_index, 'res':res, 'job_name':job_name}
+        if parallel:
+            start = time.time()
+            pool = mp.Pool(processes=len(self.system._reps))
+            results = pool.map(rmsf, self.system._reps)
+            i = 0
+            for rep in self.system._reps:
+                rep.rmsf.load(job_name)
+                i += 1
+            end = time.time()
+            # print(end-start)
+        else:
+            start = time.time()
+            results = []
+            for rep in self.system._reps:
+                rms = rmsf(rep)
+                if isinstance(rms, Exception):
+                  raise rms
+                else:
+                    rep.rmsf.load(job_name)
+                    results.append(rms)
+            end = time.time()
+            # print(end-start)
+        # self.system.update(results)
+        return self.system
+
+    def cluster(self, inp, top, job_name='cluster', output='cluster.csv', selection='backbone', stride=100, b=0, e=-1, cutoff=0.2, n_clusters=None,
+                nprocs=12, method='kmeans', linkage='ward', distance_threshold=45, reduce='pca', scale=True, verbose=False, **kwargs):
+        for rep in self.system._reps:
+            i = os.path.join(rep.root, inp)
+            t = os.path.join(rep.root, top)
+            clust = Cluster(i, t, selection=selection, stride=stride, b=b, e=e, cutoff=cutoff, verbose=verbose)
+            o = os.path.join(rep.root, job_name, output)
+            if not os.path.isdir(os.path.join(rep.root, job_name)):
+                os.mkdir(os.path.join(rep.root, job_name))
+            clust.parent = rep
+            clust.root = os.path.join(rep.root, job_name)
+            job_params = {
+                'job_name':job_name,
+                'selection':selection,
+                'stride':stride,
+                'b':b,
+                'e':e,
+                'n_clusters':n_clusters,
+                'nprocs':nprocs,
+                'method':method,
+                'linkage':linkage,
+                'distance_threshold':distance_threshold,
+                'reduce':reduce,
+                'scale':scale
+                
+            }
+            clust.job_params = job_params
+            clust.run(nprocs, o)
+            if reduce == 'pca':
+                clust.pca()
+            if method == 'kmeans':
+                clust.kmeans(n_clusters=n_clusters, output=None)
+            if method == 'agglomerative':
+                clust.agglomerative(n_clusters=n_clusters, linkage=linkage, distance_threshold=distance_threshold)
+            if method == 'gromos':
+                clust.gromosCluster()
+            clust.writePDB()
+            # rep.cluster.analyze = clust.analyze
+
+    def dist(self, inp, top='system', job_name='dist', output='dist.csv',res=False, selection='backbone', stride=100, 
+            parallel=False, nprocs='auto', compress=True, exclude_chain=True, exclude_neighbors=2):
+        self.system.job_params = {'_inp':inp,'_topfile':top,'_output':output, 'selection':selection,
+                                    'res':res, 'job_name':job_name, 'nprocs':nprocs, 'compress':compress,
+                                    'exclude_chain':exclude_chain, 'exclude_neighbors':exclude_neighbors}
+        for rep in self.system._reps:
+            obj = Distance(parent=rep, **self.system.job_params)
+            rep.dist = obj
+            rep.dist.load()
+            rep.dist.by_atom()
+        # if parallel:
+        #     pass
+        #     # print(end-start)
+        # else:
+        #     start = time.time()
+        #     results = []
+        #     for rep in self.system._reps:
+        #         obj = Distance(parent=rep, **self.system.job_params)
+        #         rep.dist = obj
+        #         rep.dist.load()
+        #         rep.dist.select()
+        #         break
+        #     end = time.time()
+        # print(end-start)
+        # return self.system
 
     def getHeader(self, job_name, walltime, nodes=1, ntasks_per_node=24):
         header = []
@@ -305,56 +401,6 @@ class Run:
             os.chdir(tmp)
     
 
-    def rmsf(self, group, res=False, start=None, stop=None, run=True):
-        '''
-        Writes & submits .sh file to perform rmsf calculations
-        '''
-        filename = 'rmsf_{}_{}.sh'.format(group, self.name)
-        filename = os.path.join(self.directory['scripts'], filename)
-        f = open(filename,'w')
-        header = self.getHeader(job_name='{}_rmsf'.format(self.name), walltime='10:00:00')
-        for line in header:
-            f.write(line)
-        f.write('\n\n')
-        for rep in range(1, self.reps+1):
-            if self.directory[rep]['xtc_pro_sm'] is not None:
-                xtc = self.directory[rep]['xtc_pro_sm']
-            elif self.directory[rep]['xtc_pro'] is not None:
-                xtc = self.directory[rep]['xtc_pro']
-            else:
-                xtc = self.directory[rep]['xtc_system']
-            tpr = self.directory[rep]['tpr']
-
-            ndx_filename = os.path.join(self.directory[rep]['root'], 'rmsf_{}.ndx'.format(group))
-            self.makeNDX(rep, groups=(group,), filename=ndx_filename)
-            if (start is None) and (stop is None):
-                output_path = os.path.join(self.directory[rep]['rmsf']['root'], 'rmsf_{}.xvg'.format(group))
-                od_path = os.path.join(self.directory[rep]['rmsf']['root'], 'rmsdev_{}.xvg'.format(group))
-                oc_path = os.path.join(self.directory[rep]['rmsf']['root'], 'correl_{}.xvg'.format(group))
-            else:
-                strt = int(start / 1000)
-                stp = int(stop / 1000)
-                output_path = os.path.join(self.directory[rep]['rmsf']['root'], 'rmsf_{}_{}_{}.xvg'.format(group, strt, stp))
-                od_path = os.path.join(self.directory[rep]['rmsf']['root'], 'rmsdev_{}_{}_{}.xvg'.format(group, strt, stp))
-                oc_path = os.path.join(self.directory[rep]['rmsf']['root'], 'correl_{}_{}_{}.xvg'.format(group, strt, stp))
-            if res is False:
-                if (start is None) and (stop is None):
-                    cmd = 'echo 0 | gmx rmsf -f {} -s {} -n {} -o {} -od {} -oc {}\n'.format(xtc, tpr, ndx_filename, output_path, od_path, oc_path)
-                else:
-                   cmd = 'echo 0 | gmx rmsf -f {} -s {} -n {} -o {} -od {} -oc {} -b {} -e {}\n'.format(xtc, tpr, ndx_filename, output_path, od_path, oc_path, start, stop) 
-            else:
-                if (start is None) and (stop is None):
-                    cmd = 'echo 0 | gmx rmsf -res -f {} -s {} -n {} -o {} -od {} -oc {}\n'.format(xtc, tpr, ndx_filename, output_path, od_path, oc_path)
-                else:
-                    cmd = 'echo 0 | gmx rmsf -res -f {} -s {} -n {} -o {} -od {} -oc {} -b {} -e {}\n'.format(xtc, tpr, ndx_filename, output_path, od_path, oc_path, start, stop)
-            f.write(cmd)
-            f.write('\nwait\n\n')
-        f.close()
-        if run is True:
-            home = os.getcwd()
-            os.chdir(self.directory['scripts'])
-            os.system('sbatch {}'.format(filename))
-            os.chdir(home)
    
     def rmsfSidechain(self, run=True):
         '''
@@ -382,93 +428,6 @@ class Run:
         if run is True:
             os.system('sbatch {}'.format(filename))
         
-    def cluster(self, stop, start=None, interval=None, cutoff=0.2, rep=None, sm=True, run=True):
-        '''
-        Writes & submits .sh file to perform clustering
-        '''
-        if rep is None:
-            filename = 'cluster_{}.sh'.format(self.name)
-        else:
-            filename = 'cluster_{}_rep{}.sh'.format(self.name, rep)
-        filename = os.path.join(self.directory['scripts'], filename)
-        f = open(filename, 'w')
-        header = self.getHeader(job_name='{}_cluster'.format(self.name), walltime='20:00:00')
-        for line in header:
-            f.write(line)
-        f.write('\n\n')
-        _rep = rep
-        for rep in range(1, self.reps+1):
-            if _rep is not None:
-                if rep != _rep:
-                    continue
-            # if 'cluster.ndx' not in os.listdir(self.directory[rep]['root']):
-            ndx_filename = self.makeNDX(rep, custom='cluster', sm=sm)
-            # else:
-            #     ndx_filename = os.path.join(self.directory[rep]['root'], 'cluster.ndx')
-
-            if self.directory[rep]['xtc_pro_sm'] is not None:
-                xtc = self.directory[rep]['xtc_pro_sm']
-            elif self.directory[rep]['xtc_pro'] is not None:
-                xtc = self.directory[rep]['xtc_pro']
-            else:
-                xtc = self.directory[rep]['xtc_system']
-            if interval is None:
-                for i in range(0, stop, 100000):
-                    root = self.directory[rep]['clusters']['root']
-                    xpm_filename = 'rmsd_clust_{}_{}.xpm'.format(str(int(i/1000)), str(int((i + 100000)/1000)))
-                    xpm_filepath = os.path.join(root, xpm_filename)
-                    log_filename = 'cluster_{}_{}.log'.format(str(int(i/1000)), str(int((i + 100000)/1000)))
-                    log_filepath = os.path.join(root, log_filename)
-                    pdb_filename = 'clusters_{}_{}.pdb'.format(str(int(i/1000)), str(int((i + 100000)/1000)))
-                    pdb_filepath = os.path.join(root, pdb_filename)
-                    size_filename = 'cluster_size_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + 100000)/1000)))
-                    size_filepath = os.path.join(root, size_filename)
-                    dist_filename = 'rmsd_dist_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + 100000)/1000)))
-                    dist_filepath = os.path.join(root, dist_filename)
-                    cmd = 'echo {} {} | gmx cluster -n {} -f {} -s {} -method gromos -o {} -minstruct 200 -g {} -cl {} -wcl 10 -cutoff 0.2 -sz {} -dist {} -b {} -e {}\n'.format(str(0), str(1), ndx_filename, xtc, self.directory[rep]['tpr'], xpm_filepath, log_filepath, pdb_filepath, size_filepath, dist_filepath, str(i), str(i+100000))
-                    f.write(cmd)
-                    f.write('\nwait\n\n')
-            else:
-                if start is not None:
-                    for i in range(start, stop, interval):
-                        root = self.directory[rep]['clusters']['root']
-                        xpm_filename = 'rmsd_clust_{}_{}.xpm'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        xpm_filepath = os.path.join(root, xpm_filename)
-                        log_filename = 'cluster_{}_{}.log'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        log_filepath = os.path.join(root, log_filename)
-                        pdb_filename = 'clusters_{}_{}.pdb'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        pdb_filepath = os.path.join(root, pdb_filename)
-                        size_filename = 'cluster_size_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        size_filepath = os.path.join(root, size_filename)
-                        dist_filename = 'rmsd_dist_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        dist_filepath = os.path.join(root, dist_filename)
-                        cmd = 'echo {} {} | gmx cluster -n {} -f {} -s {} -method gromos -o {} -minstruct 200 -g {} -cl {} -wcl 10 -cutoff {} -sz {} -dist {} -b {} -e {}\n'.format(str(0), str(1), ndx_filename, xtc, self.directory[rep]['tpr'], xpm_filepath, log_filepath, pdb_filepath, cutoff, size_filepath, dist_filepath, str(i), str(i+interval))
-                        f.write(cmd)
-                        f.write('\nwait\n\n')
-                else:
-                    for i in range(0, stop, interval):
-                        root = self.directory[rep]['clusters']['root']
-                        xpm_filename = 'rmsd_clust_{}_{}.xpm'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        xpm_filepath = os.path.join(root, xpm_filename)
-                        log_filename = 'cluster_{}_{}.log'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        log_filepath = os.path.join(root, log_filename)
-                        pdb_filename = 'clusters_{}_{}.pdb'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        pdb_filepath = os.path.join(root, pdb_filename)
-                        size_filename = 'cluster_size_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        size_filepath = os.path.join(root, size_filename)
-                        dist_filename = 'rmsd_dist_{}_{}.xvg'.format(str(int(i/1000)), str(int((i + interval)/1000)))
-                        dist_filepath = os.path.join(root, dist_filename)
-                        cmd = 'echo {} {} | gmx cluster -n {} -f {} -s {} -method gromos -o {} -minstruct 200 -g {} -cl {} -wcl 10 -cutoff {} -sz {} -dist {} -b {} -e {}\n'.format(str(0), str(1), ndx_filename, xtc, self.directory[rep]['tpr'], xpm_filepath, log_filepath, pdb_filepath, cutoff, size_filepath, dist_filepath, str(i), str(i+interval))
-                        f.write(cmd)
-                        f.write('\nwait\n\n')
-            f.write('\n\n')
-        f.close()
-        if run is True:
-            home = os.getcwd()
-            os.chdir(self.directory['scripts'])
-            os.system('sbatch {}'.format(filename))
-            print('sbatch {}'.format(filename))
-            os.chdir(home)
 
     def mindist(self, groups, start=None, stop=None, reps=None, run=True, parallel=True, ndxt=None, runsingle=True):
         '''

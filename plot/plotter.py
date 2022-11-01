@@ -289,60 +289,56 @@ class Plotter:
         else:
             plt.show()
     
-    def markerPlot(self, pdata):
+    def markerPlot(self, pdata, fig=None, ax=None, show=True):
 
         # init plot
         fig, ax = plt.subplots()
-        fig.set_size_inches(8,6)
+        fig.set_size_inches(10,6)
         
         z = 1
         for d in pdata.data:
-            errorbars = ax.errorbar(x=d.x, y=d.y, xerr=None, yerr=d.yerr, marker='o',capsize=12, elinewidth=1, capthick=1.5, ms=7, fillstyle='full', fmt='none', color=d.color, label=None, zorder=z)
+            errorbars = ax.errorbar(x=d.x, y=d.y, xerr=None, yerr=d.yerr, marker=d.marker,capsize=d.capsize, elinewidth=1, capthick=1.5, ms=7, fillstyle='full', fmt='none', color=d.color, label=None, zorder=z)
             z += 1
-            if (hasattr(d, 'lineconnect')):
-                if d.lineconnect is True:
-                    lineconnect = ax.plot(d.x, d.y, color=d.color, label='_nolegend_', zorder=z)
-                    z += 1
-            points = ax.scatter(d.x, d.y, s=d.s, color=d.color, label=d.label, zorder=z)
+            points = ax.scatter(d.x, d.y, s=d.s, color=d.color, label=d.label, zorder=z, clip_on=False)
             z += 1
-        if hasattr(pdata, 'lineconnect'):
-            if d.lineconnect is False:
-                z = 0
-                for d in pdata.lineconnect:
-                    ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=d.linestyle, zorder=z)
 
         # labels and axes
-        if (hasattr(pdata.xticks, 'xmin')) and (hasattr(pdata.xticks, 'xmax')):
-            ax.set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
-        if (hasattr(pdata.yticks, 'ymin')) and (hasattr(pdata.yticks, 'ymax')):
-            ax.set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
+        ax.set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
+        ax.set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
 
-        if hasattr(pdata.xticks, 'locs'):
+        xticks, xticklabels = plt.xticks()
+        dx = (xticks[0] - xticks[0]+1)/2
+        print(xticks, '\n', dx)
+        ax.set_xlim(pdata.xticks.xmin-dx, pdata.xticks.xmax+dx)
+        ax.set_xticks(xticks)
+        if (hasattr(pdata.xticks, 'locs')) and (pdata.xticks.locs is not None):
             ax.xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
-        if hasattr(pdata.yticks, 'locs'):
+        # plt.xticks(fontsize=pdata.xticks.fontsize)
+        if (hasattr(pdata.yticks, 'locs')) and (pdata.yticks.locs is not None):
             ax.yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
-        
-        if hasattr(pdata.xticks, 'minor_locs'):
+        # plt.yticks(fontsize=pdata.yticks.fontsize)
+        ax.tick_params(axis='both', which='major', labelsize=pdata.xticks.fontsize)
+
+        if (hasattr(pdata.xticks, 'minor_locs')) and (pdata.xticks.minor_locs is not None):
             ax.xaxis.set_minor_locator(MultipleLocator(pdata.xticks.minor_locs))
-        if hasattr(pdata.yticks, 'minor_locs'):
+        if (hasattr(pdata.yticks, 'minor_locs')) and (pdata.yticks.minor_locs is not None):
             ax.yaxis.set_minor_locator(MultipleLocator(pdata.yticks.minor_locs))
 
         if hasattr(pdata.xticks, 'xlabels'):
-            ax.set_xticklabels(pdata.xticks.xlabels)
-            if hasattr(pdata.xticks, 'rotation'):
-                plt.setp(ax.xaxis.get_majorticklabels(), rotation=pdata.xticks.rotation)
-            if hasattr(pdata.xticks, 'pad'):
-                ax.xaxis.labelpad=pdata.xticks.pad
-            if hasattr(pdata.xticks, 'offset'):
-                if pdata.xticks.offset is not None:
-                    dx = pdata.xticks.offset
-                    dy = 0
-                    offset = transforms.ScaledTranslation(dx, dy, fig.dpi_scale_trans)
-                    for label in ax.xaxis.get_majorticklabels():
-                        label.set_transform(label.get_transform() + offset)
+            if pdata.xticks.xlabels is not None:
+                ax.set_xticklabels(pdata.xticks.xlabels)
+                if hasattr(pdata.xticks, 'pad'):
+                    ax.xaxis.labelpad=pdata.xticks.pad
+                if hasattr(pdata.xticks, 'offset'):
+                    if pdata.xticks.offset is not None:
+                        dx = pdata.xticks.offset
+                        dy = 0
+                        offset = transforms.ScaledTranslation(dx, dy, fig.dpi_scale_trans)
+                        for label in ax.xaxis.get_majorticklabels():
+                            label.set_transform(label.get_transform() + offset)
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=pdata.xticks.rotation)
         if hasattr(pdata.yticks, 'ylabels'):
             ax.set_yticklabels(pdata.yticks.ylabels)
-
         plt.xticks(fontsize=pdata.xticks.fontsize)
         plt.yticks(fontsize=pdata.yticks.fontsize)
 
@@ -369,16 +365,17 @@ class Plotter:
             else:
                 ax.legend(loc=pdata.legend.loc, markerscale=pdata.legend.markerscale, fontsize=10, ncol=pdata.legend.ncol)
 
-        if hasattr(pdata.fig, 'layout'):
-            if pdata.fig.layout == 'tight':
-                plt.tight_layout()
+        plt.tight_layout()
         # saving
-        if pdata.saveto.endswith('png'):
-            plt.savefig(pdata.saveto, dpi=300)
-        else:
-            plt.savefig(pdata.saveto)
+        if pdata.saveto is not None:
+            if pdata.saveto.endswith('png'):
+                plt.savefig(pdata.saveto, dpi=300)
+            else:
+                plt.savefig(pdata.saveto)
+            print('Plotted {}'.format(pdata.saveto))
+        if show:
+            plt.show()
         plt.close()
-        print('Plotted {}'.format(pdata.saveto))
         return pdata.saveto
 
     def markerPlotPanel(self, data, output, title, legend_data=None):

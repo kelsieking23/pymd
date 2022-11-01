@@ -148,7 +148,6 @@ class PlotData:
                 'y_label':'', 
                 's':{}
             }
-        print(df.attrs['y_label'])
         # axis labels and locations
         if x_label is not None:
             xlabel = ElementParam(label=x_label, fontsize=ax_label_fontsize)
@@ -193,7 +192,116 @@ class PlotData:
 
         return cls('timeseries', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto, legend_data=legend_data)
 
+    @classmethod
+    def markerPlot(cls, df, colors=None, title=None, marker='o', x_label='Residue', y_label=None, ymin=-0.2, ymax=None, output=None, major_xticks=None, major_yticks=None, 
+                    minor_xticks=None, minor_yticks=None, rotation=0, ncol=1, labels='columns', tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
+                    legend_fontsize=12, semiopen=False):
+        data = []
+        i = 0
+        s = 14900/len(df.index)
+        smax = s
+        _ymax = None
+        markers = [marker] * len(df)
+        last_marker = None
+        if colors is None:
+            # colors = ['#1f464c', '#2a8a2d', '#8a47b0', '#9bcccc']
+            colors = plt.cm.RdBu(np.linspace(0, 2.5,len(df.columns)))
+        # if major_xticks is None:
+        #     major_xticks = len(df.index) / 10
+        # if minor_xticks is None:
+        #     if major_xticks > 1:
+        #         minor_xticks = major_xticks / 2
+        for column in df.columns:
+            try:
+                if column.endswith('std'):
+                    break
+            except:
+                pass
+            # decide labels for legend
+            if labels is None:
+                label = '__nolegend__'
+            elif labels == 'columns':
+                label = column
+            else:
+                label = labels[i]
 
+            # decide color
+            if isinstance(colors, dict):
+                color = colors[column]
+            if (isinstance(colors, list)) or (isinstance(colors, np.ndarray)):
+                color = colors[i]
+
+            # assign marker size 
+            if last_marker is None:
+                last_marker = markers[i]
+            else:
+                if markers[i] != last_marker:
+                    s = len(df) * 100
+            std_col = column + '-std'
+
+            if std_col in df.columns:
+                yerr = df[std_col]
+                if _ymax is None:
+                    _ymax = df[std_col].max()
+                else:
+                    if df[std_col].max() > _ymax:
+                        _ymax = df[std_col].max()
+            else:
+                yerr=None
+            d = Data(df=df, x=df.index, y=df[column], yerr=yerr, capsize=smax/100, color=colors[i], label=label, 
+                    s=s, marker=markers[i])
+
+            data.append(d)
+            i += 1 
+            s = s * 0.75
+        # tick labels and locations
+        
+        xticks = ElementParam(xmin=df.index[0], xmax=round(df.index[-1]), locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, rotation=rotation)
+        if ymax is None:
+            if _ymax is None:
+                ymax = math.ceil(df.max().max())
+            else:
+                ymax = math.ceil(df.max().max() + _ymax)
+
+        yticks = ElementParam(ymin=ymin, ymax=ymax, locs=major_yticks, fontsize=tick_label_fontsize, minor_locs=minor_yticks)
+
+        if (hasattr(df, 'attrs')) and (df.attrs != {}):
+            pass
+        else:
+            df.attrs = {
+                'title':'',
+                'x_label':'',
+                'y_label':'', 
+                's':{}
+            }
+        # axis labels and locations
+        if x_label is not None:
+            xlabel = ElementParam(label=x_label, fontsize=ax_label_fontsize)
+        else:
+            xlabel = ElementParam(label=df.attrs['x_label'], fontsize=ax_label_fontsize)
+        if y_label is not None:
+            ylabel = ElementParam(label=y_label, fontsize=ax_label_fontsize)
+        else:
+            ylabel = ElementParam(label=df.attrs['y_label'], fontsize=ax_label_fontsize)
+
+
+        fig = ElementParam(width=8, height=6, layout='tight')
+
+
+        xlabel = ElementParam(label=x_label, fontsize=16)
+        ylabel = ElementParam(label=y_label, fontsize=16)
+
+        title = ElementParam(title=title, fontsize=24)
+
+        axes = ElementParam(off=False, semiopen=semiopen)
+
+        legend = ElementParam(loc='upper right', markerscale=0.60, ncol=ncol, fontsize=16)
+
+        annotations = None
+
+        saveto = output
+
+        return cls('marker', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     @classmethod
     def dsspOverTime(cls, df, title=None, structure='all', annotations=None, output=None, legend=True, colors=None, std=False, linewidth=2, gridline=None):
         if colors is None:
@@ -1139,89 +1247,6 @@ class PlotData:
 
         return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
    
-    @classmethod
-    def markerPlot(cls, dfs, colors=None, title=None, markers=None, xlabels=None, ymin=0, ymax=3, output=None, rotation=None, xlabelfontsize=17, ncol=1, labels=None, lineconnect_dfs=None, lineconnect_labels=None, lineconnect_colors=None):
-        data = []
-        i = 0
-        s = len(dfs)*100
-        _ymax = None
-        if markers is None:
-            markers = ['o'] * len(dfs)
-        last_marker = None
-        if colors is None:
-            colors = ['#1f464c','#2a8a2d','#2a8a2d','#9bcccc']
-        for df in dfs:
-            if last_marker is None:
-                last_marker = markers[i]
-            else:
-                if markers[i] != last_marker:
-                    s = len(dfs) * 100
-            if labels is None:
-                if (lineconnect_dfs is None):
-                    d = Data(df=df, x=df.index, y=df['mean'], yerr=df['stdev'], color=colors[i], label='Replicate {}'.format(i+1), 
-                            s=s, lineconnect=True, marker=markers[i])
-                else:
-                    d = Data(df=df, x=df.index, y=df['mean'], yerr=df['stdev'], color=colors[i], label='Replicate {}'.format(i+1), 
-                            s=s, lineconnect=False, marker=markers[i])
-            else:
-                if (lineconnect_dfs is None):
-                    d = Data(df=df, x=df.index, y=df['mean'], yerr=df['stdev'], color=colors[i], label=labels[i], 
-                            s=s, lineconnect=True, marker=markers[i])
-                else:
-                    d = Data(df=df, x=df.index, y=df['mean'], yerr=df['stdev'], color=colors[i], label=labels[i], 
-                            s=s, lineconnect=False, marker=markers[i]) 
-            data.append(d)
-            i += 1 
-            s -= 100
-            if _ymax is None:
-                _ymax = df['mean'].max()
-            else:
-                if df['mean'].max() > _ymax:
-                    _ymax = df['mean'].max()
-        
-        lineconnect_data = None
-        if lineconnect_dfs is not None:
-            lineconnect_data = []
-            linestyles = ['solid', 'dashed', 'dotted']
-            i = 0
-            if lineconnect_colors is None:
-                lineconnect_colors = ['#000000'] * len(lineconnect_dfs)
-            for df in lineconnect_dfs:
-                if lineconnect_labels is None:
-                    lbl = '__nolegend__'
-                else:
-                    lbl = lineconnect_labels[i]
-                d = Data(df=df, x=df.index, y=df['mean'], color=lineconnect_colors[i], linestyle=linestyles[i], label=lbl)
-                lineconnect_data.append(d)
-                i += 1
-
-
-        fig = ElementParam(width=8, height=6, layout='tight')
-
-        if ymax is None:
-            ymax = round(_ymax) + 2
-
-        if xlabels is not None:
-            if xlabels[0] != 0:
-                xlabels.insert(0,0)
-
-        xticks = ElementParam(locs=1, fontsize=xlabelfontsize, xlabels=xlabels, rotation=rotation)
-        yticks = ElementParam(ymin=ymin, ymax=ymax, fontsize=13, locs=100, minor_locs=20)
-
-        xlabel = ElementParam(label='Residue', fontsize=16)
-        ylabel = ElementParam(label='Solvent Accessible Surface Area ($\AA^2$)', fontsize=16)
-
-        title = ElementParam(title=title, fontsize=24)
-
-        axes = ElementParam(off=False, semiopen=False)
-
-        legend = ElementParam(loc='upper right', markerscale=0.60, ncol=ncol, fontsize=16)
-
-        annotations = None
-
-        saveto = output
-
-        return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto, lineconnect=lineconnect_data)
    
     '''
     Multi-System Class Methods

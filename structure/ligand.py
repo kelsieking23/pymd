@@ -6,6 +6,7 @@
 ####################################################################################################################
 import os
 import numpy as np
+from pymd.structure.protein import Atom
 
 class StaticLigand:
 
@@ -21,6 +22,7 @@ class StaticLigand:
         ** model (optional): string. If ligand structure file has multiple models, specify which to use as coordinates. Defaults to MODEL 1. 
         ** alt (optional):  string. Gives ligand an alternative name, which can be used in certain functions. 
         '''
+        self.atoms = []
         self.structure = structure
         self.covalent_id = covalent_id
         if name is not None:
@@ -39,9 +41,10 @@ class StaticLigand:
         # self.log = self.getLog()
         if alt is not None:
             self.alt = alt
+        
+        self._minimum_distance = None
     
         
-    
     def getLog(self):
         directory = os.path.dirname(self.structure)
         files = os.listdir(directory)
@@ -50,6 +53,10 @@ class StaticLigand:
                 log_path = os.path.join(directory, filename)
                 return log_path
     
+    @property
+    def minimum_distance(self):
+        return self._minimum_distance
+
     def getCovalentCoordinates(self, ignh):
         '''
         Gets coordinates from protein structure file. 
@@ -185,8 +192,9 @@ class Ligand:
             if isinstance(model_coords, list):
                 # print('WARNING: model {} was specified, but only one model found in structure {}.'.format(model, structure))
                 self.coordinates = model_coords
+        self.coordinates = self.getAtomCoordinates()
         self.covalent_id = None
-        self.log = self.getLog()
+        # self.log = self.getLog()
     def split(self, ignh):
         '''
         Splits structure file into multiple models.
@@ -250,8 +258,11 @@ class Ligand:
             pdb.append(str(c))
         return pdb
 
-    def getAtomCoordinates(self, data):
+    def getAtomCoordinates(self, data=None):
+        if data is None:
+            data = open(self.structure, 'r')
         atom_coords = {}
+        self.atoms = []
         atom_types = ('ATOM', 'HETATM')
         for line in data:
             line_parts = line.split()
@@ -266,6 +277,7 @@ class Ligand:
                     atom_coords[atom_num] = list(map(float, line_parts[5:8]))
             else:
                 continue
+            self.atoms.append(Atom(line_parts, self))
         return atom_coords
     
     def getAtomTypes(self):

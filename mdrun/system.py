@@ -9,6 +9,7 @@ from pymd.mdanalysis.analysis import Analysis
 from pymd.mdanalysis.systemanalysis import SystemAnalysis
 from pymd.structure.protein import Protein
 from pymd.mdrun.run import Run
+from pymd.mdanalysis.cluster import Cluster
 
 class System:
     '''
@@ -49,6 +50,7 @@ class System:
         if (self.protein is None) and (protein is not None):
             self.protein = Protein(structure=protein)
         self.job_params = None
+        self.job = None
         # self.analyze = Analyzer(self)
     
     @staticmethod
@@ -109,12 +111,22 @@ class System:
         #         os.mkdir(os.path.join(directory['images']['root'], atype))
         #     directory['images'][atype] = os.path.join(directory['images']['root'], atype)
         self._reps = []
+        folder_names = sorted([folder for folder in os.listdir(self.root) if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder)))])
+        custom_names = False
+        for folder in os.listdir(self.root):
+            if (not folder.startswith('rep')) and (not folder.isnumeric()):
+                if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder))):
+                    custom_names = True
+                    break
         for rep in range(1, self.reps+1):
             repnum = rep
             rep = 'rep{}'.format(rep)
-            _dir = os.path.join(self.root, str(rep))
-            if not os.path.isdir(_dir):
-                _dir = os.path.join(self.root, str(repnum))
+            if custom_names is False:
+                _dir = os.path.join(self.root, str(rep))
+                if not os.path.isdir(_dir):
+                    _dir = os.path.join(self.root, str(repnum))
+            else:
+                _dir = os.path.join(self.root, folder_names[repnum-1])
             directory[rep] = {}
             directory[rep]['root'] = _dir
             directory[rep]['id'] = rep
@@ -156,6 +168,7 @@ class System:
 
 
             _gro = None
+            gro = None
             highest_ns = 0
             for gro in gros:
                 path_parts = gro.split(os.sep)
@@ -270,7 +283,11 @@ class System:
 
             directory[rep] = Subsystem(directory[rep], self)
             self.rmsd = SystemAnalysis(self, name='rmsd')
-            directory[rep].rmsd = Analysis(directory[rep], name='rmsd')
+            self.rmsf = SystemAnalysis(self, name='rmsf')
+            self.cluster = SystemAnalysis(self, name='cluster')
+            # directory[rep].rmsd = Analysis(parent=directory[rep], name='rmsd')
+            # directory[rep].rmsf = Analysis(parent=directory[rep], name='rmsf')
+            # directory[rep].cluster = Analysis(parent=directory[rep], name='cluster')
             self._reps.append(directory[rep])
         return directory
 
@@ -334,10 +351,15 @@ class System:
                     directory[rep][location][folder]['data'].append(p)
             return directory
 
-    def load(self, job):
+    def load(self, job, **kwargs):
         for rep in self._reps:
-            analysis = rep.getChildByJobName(job)
-            analysis.load(job)
+            rep.job = Analysis(job, parent=rep, **kwargs)
+            
+            # analysis = rep.getChildByJobName(job)
+            # if job_name is not None:
+            #     analysis.load(job_name=job_name)
+            # else:
+            #     analysis.load(job_name=job)
 
     def getChildByJobName(self, job_name):
         if job_name == 'rmsd':
@@ -346,11 +368,14 @@ class System:
             return self.rmsf
         if job_name == 'hbonds':
             return self.hbonds
+        if job_name == 'cluster':
+            return self.cluster
 class Subsystem(System):
 
     def __init__(self, dict, parent):
         self.__dict__.update(dict)
         self.parent = parent
+        self.job = None
     
     def getChildByJobName(self, job_name):
         if job_name == 'rmsd':
@@ -359,6 +384,8 @@ class Subsystem(System):
             return self.rmsf
         if job_name == 'hbonds':
             return self.hbonds
+        if job_name == 'cluster':
+            return self.cluster
 
     
     

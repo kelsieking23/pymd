@@ -83,21 +83,38 @@ class SystemAnalysis:
         df = pd.concat(dfs).groupby(level=0).mean()
         df.attrs = attrs
         return df
+    def averageIndex(self):
+        df = pd.DataFrame()
+        i = 0
+        for rep in self.parent._reps:
+            analysis = rep.getChildByJobName(self.name)
+            for col in analysis.df.columns:
+                df[i] = analysis.df[col]
+                i += 1
+        df['mean'] = df.mean(axis=1)
+        df = df.drop([col for col in df.columns if col != 'mean'], axis=1)
+        return df
 
     def plot_with(self, systems, nrows, ncols, average_by='all', ptype='infer', sharex=True, sharey=True, suptitle=None, titles=[], output=None, show=True, **kwargs):
         if ptype == 'infer':
             tmp = self.parent.rep1.getChildByJobName(self.name)
             if hasattr(tmp, 'df'):
-                ptype = tmp.df.attrs['ptype']
+                if not hasattr(tmp.df, 'attrs'):
+                    ptype='infer'
+                else:
+                    ptype = tmp.df.attrs['ptype']
         if ptype == 'timeseries':
             # axes.append(self.plotTimeseries(average_by=average_by, output=None, show=False))
             pdatas = []
             if average_by == 'all':
                 df = self.averageAll()
+            if average_by == 'index':
+                df = self.averageIndex()
             if titles != []:
                 title = titles[0]
             else:
                 title = None
+            print(df)
             pdatas.append(PlotData.timeseries(df, output=None, title=title, **kwargs))
             i = 1
             for system in systems:
