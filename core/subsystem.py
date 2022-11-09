@@ -167,7 +167,9 @@ class Subsystem(PostProcess):
                 pdatas.append(PlotData.heatmap(system.df, **kwargs))
             self.plotter.heatmap(pdatas, show=show, output=output)
         elif ptype == 'dssp':
-            pdata = PlotData.dsspOverTime(df, output=output, **kwargs)
+            pdatas.append(PlotData.dsspOverTime(self.df, output=output, **kwargs))
+            for system in systems:
+                pdatas.append(PlotData.dsspOverTime(system.df, **kwargs))
             self.plotter.timeseries(pdata, show=show)
         else:
             raise ValueError('no valid type')
