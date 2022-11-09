@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 import sys
 
+from pymd.core.subsystem import Subsystem
 from pymd.plot.plotter import Plotter, SystemPlot
 from pymd.mdanalysis.postprocess import PostProcess
-from pymd.mdanalysis.analysis import Analysis
 from pymd.mdanalysis.systemanalysis import SystemAnalysis
 from pymd.structure.protein import Protein
 from pymd.mdrun.run import Run
@@ -280,8 +280,8 @@ class System:
                             break
             directory[rep]['run_xtcs'] = sort
 
-
-            directory[rep] = Subsystem(directory[rep], self)
+            directory[rep]['id'] = rep
+            directory[rep] = Subsystem.from_dict(directory[rep], self)
             self.rmsd = SystemAnalysis(self, name='rmsd')
             self.rmsf = SystemAnalysis(self, name='rmsf')
             self.cluster = SystemAnalysis(self, name='cluster')
@@ -353,7 +353,8 @@ class System:
 
     def load(self, job, **kwargs):
         for rep in self._reps:
-            rep.job = Analysis(job, parent=rep, **kwargs)
+
+            rep.load(job, **kwargs)
             
             # analysis = rep.getChildByJobName(job)
             # if job_name is not None:
@@ -370,22 +371,7 @@ class System:
             return self.hbonds
         if job_name == 'cluster':
             return self.cluster
-class Subsystem(System):
 
-    def __init__(self, dict, parent):
-        self.__dict__.update(dict)
-        self.parent = parent
-        self.job = None
-    
-    def getChildByJobName(self, job_name):
-        if job_name == 'rmsd':
-            return self.rmsd
-        if job_name == 'rmsf':
-            return self.rmsf
-        if job_name == 'hbonds':
-            return self.hbonds
-        if job_name == 'cluster':
-            return self.cluster
 
     
     

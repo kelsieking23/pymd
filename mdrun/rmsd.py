@@ -6,7 +6,6 @@ import os
 import pandas as pd
 import sys
 # sys.path.append('/work/cascades/kelsieking23/software/')
-sys.path.append('D:/Work')
 from pymd.mdanalysis.trajectory import Trajectory
 
 

@@ -563,7 +563,7 @@ class Plotter:
         plt.close()
         print('Plotted {}'.format(output))
 
-    def heatmap(self, pdata):
+    def heatmap(self, pdata, fig=None, ax=None, show=True):
         fig, ax = plt.subplots()
         if pdata.fig is None:
             fig.set_size_inches(16,12)
@@ -635,6 +635,8 @@ class Plotter:
         else:
             # plt.show()
             pass
+        if show:
+            plt.show()
         return fig, ax
         # return pdata.saveto
         # if os.name == 'nt':

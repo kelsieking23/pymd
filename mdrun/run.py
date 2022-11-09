@@ -3,9 +3,8 @@ import sys
 import multiprocessing as mp
 import pymd
 from pymd.mdrun.runfunc import pbc, rmsd, rmsf
-from pymd.mdanalysis.cluster import Cluster
-from pymd.mdanalysis.analysis import Analysis
-from pymd.mdanalysis.dist import Distance
+from pymd.mdanalysis import Cluster, Distance
+from pymd.mdanalysis.dssp import DSSP
 from pymd.mdrun.gmx import GMX
 import time
 DIRECTORY = pymd.dir_path
@@ -164,16 +163,31 @@ class Run:
             clust.writePDB()
             # rep.cluster.analyze = clust.analyze
 
-    def dist(self, inp, top='system', job_name='dist', output='dist.csv',res=False, selection='backbone', stride=100, 
-            parallel=False, nprocs='auto', compress=True, exclude_chain=True, exclude_neighbors=2):
+    def dssp(self, inp, top, job_name='dssp', method='time',output='dssp.xvg', selection='backbone', stride=100, block_average=0, b=0, e=-1):
+        for rep in self.system._reps: # type: ignore
+            if top == 'system':
+                top = rep.gro
+            dssp = DSSP(inp, top, parent=rep, job_name=job_name, output=output, selection=selection, block_average=block_average)
+            rep.dssp = dssp
+            rep.dssp.loadTrajectory(stride=stride, selection=selection, b=b, e=e)
+            if method == 'time':
+                rep.dssp.dsspOverTime()
+                rep.load(job_name)
+
+    def dist(self, inp, top='system', job_name='dist', output='dist.csv',res=True, selection='all', stride=100, 
+            parallel=False, nprocs='auto', compress=False, exclude_chain=True, exclude_neighbors=2, **kwargs):
         self.system.job_params = {'_inp':inp,'_topfile':top,'_output':output, 'selection':selection,
                                     'res':res, 'job_name':job_name, 'nprocs':nprocs, 'compress':compress,
-                                    'exclude_chain':exclude_chain, 'exclude_neighbors':exclude_neighbors}
+                                    'exclude_chain':exclude_chain, 'stride':stride, 'exclude_neighbors':exclude_neighbors}
         for rep in self.system._reps:
-            obj = Distance(parent=rep, **self.system.job_params)
+            if top == 'system':
+                top = rep.gro
+            obj = Distance(inp=inp, top=top, parent=rep, **self.system.job_params)
             rep.dist = obj
-            rep.dist.load()
-            rep.dist.by_atom()
+            if res:
+                rep.dist.run(method='residue', **kwargs)
+            else:
+                rep.dist.run(method='atom', **kwargs)
         # if parallel:
         #     pass
         #     # print(end-start)
@@ -974,70 +988,7 @@ class Run:
             os.chdir(self.directory['scripts'])
             os.system('sbatch {}'.format(filename))
             os.chdir(tmp)     
-    def dssp(self, dssp_path, rep=None, start=None, stop=None, run=True):
-        if self.cascades == True:
-            if (start is None) and (stop is None):
-                if rep is None:
-                    filename = os.path.join(self.directory['scripts'], 'dssp_{}.sh'.format(self.name))
-                else:
-                    filename = os.path.join(self.directory['scripts'], 'dssp_{}_rep{}.sh'.format(self.name, rep))
-            else:
-                if rep is None:
-                    filename = os.path.join(self.directory['scripts'], 'dssp_{}_{}_{}.sh'.format(self.name, start, stop))
-                else:
-                   filename = os.path.join(self.directory['scripts'], 'dssp_{}_{}_{}_rep{}.sh'.format(self.name, start, stop, rep)) 
-            if filename in os.listdir(self.directory['scripts']):
-                prev = 0
-                for item in os.listdir(self.directory['scripts']):
-                    if 'dssp' in item:
-                        if 'prev' in item:
-                            prev += 1
-                backup = os.path.join(self.directory['scripts'], 'dssp_{}_prev{}.sh'.format(self.name, str(int(prev+1))))
-                os.system('mv {} {}'.format(filename, backup))
-        else:
-            filename = 'dssp_{}.sh'.format(self.name)
-        f = open(filename, 'w')
-        if (start is None) and (stop is None):
-            header = self.getHeader(job_name='{}_dssp'.format(self.name), walltime='8:00:00')
-        else:
-            header = self.getHeader(job_name='{}_dssp_{}_{}'.format(self.name, start, stop), walltime='8:00:00')
-        for line in header:
-            f.write(line)
-        f.write('\n\n')
-        cmd = 'export DSSP={} \n'.format(dssp_path)
-        f.write(cmd)
-        f.write('export GMX_MAXBACKUP=-1\n\n')
-        _rep = rep
-        for rep in range(1, self.reps+1):
-            if _rep is not None:
-                if rep != _rep:
-                    continue
-            dssp_path = self.directory[rep]['dssp']['root']
-            if self.directory[rep]['xtc_pro_sm'] is not None:
-                xtc = self.directory[rep]['xtc_pro_sm']
-            elif self.directory[rep]['xtc_pro'] is not None:
-                xtc = self.directory[rep]['xtc_pro']
-            else:
-                xtc = self.directory[rep]['xtc_system']
-            tpr = self.directory[rep]['tpr']
-            if (start is None) and (stop is None):
-                xpm = os.path.join(dssp_path, 'dssp.xpm')
-                xvg = os.path.join(dssp_path, 'dssp.xvg')
-                cmd = 'echo 1 | gmx do_dssp -f {} -s {} -o {} -sc {} \n'.format(xtc, tpr, xpm, xvg)
-                f.write(cmd)
-                f.write('wait\n\n') 
-            else:
-                xpm = os.path.join(dssp_path, 'dssp_{}_{}.xpm').format(str(int(start/1000)), str(int(stop/1000)))
-                xvg = os.path.join(dssp_path, 'dssp_{}_{}.xvg').format(str(int(start/1000)), str(int(stop/1000)))
-                cmd = 'echo 1 | gmx do_dssp -f {} -s {} -b {} -e {} -o {} -sc {} \n'.format(xtc, tpr, start, stop, xpm, xvg)
-                f.write(cmd)          
-                f.write('wait\n\n')     
-        f.close()
-        if run is True:
-            home = os.getcwd()
-            os.chdir(self.directory['scripts'])
-            os.system('sbatch {}'.format(filename))
-            os.chdir(home)
+
     
     def gyration(self, groups, ecc=False, run=True):
         filenames = []

@@ -7,6 +7,7 @@ class GMX:
     def __init__(self, system, testing):
         self.system = system
         self.testing = testing
+        self.__dict__.update(self.system.__dict__)
 
     def getHeader(self, job_name, walltime, nodes=1, ntasks_per_node=24):
         header = []
@@ -284,4 +285,69 @@ class GMX:
             os.chdir(self.directory['scripts'])
             os.system('sbatch {}'.format(filename))
             print('sbatch {}'.format(filename))
+            os.chdir(home)
+
+    def dssp(self, dssp_path, rep=None, start=None, stop=None, run=True):
+        if self.testing == False:
+            if (start is None) and (stop is None):
+                if rep is None:
+                    filename = os.path.join(self.directory['scripts'], 'dssp_{}.sh'.format(self.name))
+                else:
+                    filename = os.path.join(self.directory['scripts'], 'dssp_{}_rep{}.sh'.format(self.name, rep))
+            else:
+                if rep is None:
+                    filename = os.path.join(self.directory['scripts'], 'dssp_{}_{}_{}.sh'.format(self.name, start, stop))
+                else:
+                   filename = os.path.join(self.directory['scripts'], 'dssp_{}_{}_{}_rep{}.sh'.format(self.name, start, stop, rep)) 
+            if filename in os.listdir(self.directory['scripts']):
+                prev = 0
+                for item in os.listdir(self.directory['scripts']):
+                    if 'dssp' in item:
+                        if 'prev' in item:
+                            prev += 1
+                backup = os.path.join(self.directory['scripts'], 'dssp_{}_prev{}.sh'.format(self.name, str(int(prev+1))))
+                os.system('mv {} {}'.format(filename, backup))
+        else:
+            filename = 'dssp_{}.sh'.format(self.name)
+        f = open(filename, 'w')
+        if (start is None) and (stop is None):
+            header = self.getHeader(job_name='{}_dssp'.format(self.name), walltime='8:00:00')
+        else:
+            header = self.getHeader(job_name='{}_dssp_{}_{}'.format(self.name, start, stop), walltime='8:00:00')
+        for line in header:
+            f.write(line)
+        f.write('\n\n')
+        cmd = 'export DSSP={} \n'.format(dssp_path)
+        f.write(cmd)
+        f.write('export GMX_MAXBACKUP=-1\n\n')
+        _rep = rep
+        for rep in range(1, self.reps+1):
+            if _rep is not None:
+                if rep != _rep:
+                    continue
+            dssp_path = self.directory[rep]['dssp']['root']
+            if self.directory[rep]['xtc_pro_sm'] is not None:
+                xtc = self.directory[rep]['xtc_pro_sm']
+            elif self.directory[rep]['xtc_pro'] is not None:
+                xtc = self.directory[rep]['xtc_pro']
+            else:
+                xtc = self.directory[rep]['xtc_system']
+            tpr = self.directory[rep]['tpr']
+            if (start is None) and (stop is None):
+                xpm = os.path.join(dssp_path, 'dssp.xpm')
+                xvg = os.path.join(dssp_path, 'dssp.xvg')
+                cmd = 'echo 1 | gmx do_dssp -f {} -s {} -o {} -sc {} \n'.format(xtc, tpr, xpm, xvg)
+                f.write(cmd)
+                f.write('wait\n\n') 
+            else:
+                xpm = os.path.join(dssp_path, 'dssp_{}_{}.xpm').format(str(int(start/1000)), str(int(stop/1000)))
+                xvg = os.path.join(dssp_path, 'dssp_{}_{}.xvg').format(str(int(start/1000)), str(int(stop/1000)))
+                cmd = 'echo 1 | gmx do_dssp -f {} -s {} -b {} -e {} -o {} -sc {} \n'.format(xtc, tpr, start, stop, xpm, xvg)
+                f.write(cmd)          
+                f.write('wait\n\n')     
+        f.close()
+        if run is True:
+            home = os.getcwd()
+            os.chdir(self.directory['scripts'])
+            os.system('sbatch {}'.format(filename))
             os.chdir(home)

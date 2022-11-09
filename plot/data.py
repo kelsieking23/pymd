@@ -51,7 +51,7 @@ class PlotData:
     '''
 
     @classmethod
-    def timeseries(cls, df, title=None, labels='columns', x_label=None, y_label=None, major_xticks=None, minor_xticks=None, colors=None, output=None, ymin=0, ymax=None, 
+    def timeseries(cls, df, title=None, labels='columns', x_label=None, y_label=None, major_xticks=None, minor_xticks=None, colors=None, output=None, ymin=0.0, ymax=None, 
     legend=False, ncol=1, linewidth=2, average=False, std=False, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
     legend_fontsize=12, semiopen=True, superlegend=False):
         '''
@@ -305,49 +305,50 @@ class PlotData:
     @classmethod
     def dsspOverTime(cls, df, title=None, structure='all', annotations=None, output=None, legend=True, colors=None, std=False, linewidth=2, gridline=None):
         if colors is None:
+            colors = plt.cm.tab20b(np.linspace(0, 1,len(df.columns)))
             colors = {
-                'coil_percent':'#000080',
-                'bsheet_percent':'#a00000',
-                'helix_percent':'#000000'
+                'coil':colors[0],
+                'bsheet':colors[1],
+                'helix':colors[2]
             }
         
         if structure == 'all':
             if std is True:
-                coil = Data(df=df, x=df.index, y=df['coil_percent'], color=colors['coil_percent'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
-                bsheet = Data(df=df, x=df.index, y=df['bsheet_percent'], color=colors['bsheet_percent'], label=r'$\beta$-Strand', fill_between=df['bsheet_std'],linewidth=linewidth)
-                helix = Data(df=df, x=df.index, y=df['helix_percent'], color=colors['helix_percent'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
+                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
+                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', fill_between=df['bsheet_std'],linewidth=linewidth)
+                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
             else:
-                coil = Data(df=df, x=df.index, y=df['coil_percent'], color=colors['coil_percent'], label='Coil',linewidth=linewidth)
-                bsheet = Data(df=df, x=df.index, y=df['bsheet_percent'], color=colors['bsheet_percent'], label=r'$\beta$-Strand',linewidth=linewidth)
-                helix = Data(df=df, x=df.index, y=df['helix_percent'], color=colors['helix_percent'], label='Helix',linewidth=linewidth)
+                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil',linewidth=linewidth)
+                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',linewidth=linewidth)
+                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix',linewidth=linewidth)
         else:
             if structure == 'coil':
                 if std is True:
-                    coil = Data(df=df, x=df.index, y=df['coil_percent'], color=colors['coil_percent'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
+                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
                     bsheet = None
                     helix = None
                 else:
-                    coil = Data(df=df, x=df.index, y=df['coil_percent'], color=colors['coil_percent'], linewidth=linewidth)
+                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], linewidth=linewidth)
                     bsheet = None
                     helix = None
             if structure == 'bsheet':
                 if std is True:
                     coil = None
-                    bsheet = Data(df=df, x=df.index, y=df['bsheet_percent'], color=colors['bsheet_percent'], label=r'$\beta$-Strand',  fill_between=df['bsheet_std'],linewidth=linewidth)
+                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',  fill_between=df['bsheet_std'],linewidth=linewidth)
                     helix = None
                 else:
                     coil = None
-                    bsheet = Data(df=df, x=df.index, y=df['bsheet_percent'], color=colors['bsheet_percent'], label=r'$\beta$-Strand', linewidth=linewidth)
+                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', linewidth=linewidth)
                     helix = None
             if structure == 'helix':
                 if std is True:
                     coil = None
                     bsheet = None
-                    helix = Data(df=df, x=df.index, y=df['helix_percent'], color=colors['helix_percent'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
+                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
                 else:
                     coil = None
                     bsheet = None
-                    helix = Data(df=df, x=df.index, y=df['helix_percent'], color=colors['helix_percent'], label='Helix', linewidth=linewidth)
+                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', linewidth=linewidth)
 
         fig = None
 
@@ -380,7 +381,7 @@ class PlotData:
 
         saveto = output
 
-        return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
+        return cls('timeseries', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
 
     @classmethod
     def dsspPerResidue(cls, dfs, colors, title=None, xlabels=None, output=None):
@@ -1164,27 +1165,27 @@ class PlotData:
         return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto, lineconnect=None)
 
     @classmethod
-    def heatmap(cls, df, title, vmin=0, vmax=1, colormap=None, xlabels=None, ylabels=None, legend=True, annotate=True, output=None):
+    def heatmap(cls, df, title='', vmin=0, vmax=1, colormap=None, xlabels=None, ylabels=None, legend=True, annotate=False, output=None):
         if colormap is None:
             colormap='viridis'
         data = Data(df=df, vmin=vmin, vmax=vmax, colormap=colormap)
         if xlabels is None:
-            xlabels = []
-        else:
-            if xlabels[0] != 0:
-                xlabs = [0]
-                for item in xlabels:
-                    xlabs.append(item)
-                xlabels = xlabs
-        if ylabels is not None:
+            xlabels = df.columns
+        if xlabels[0] != 0:
+            xlabs = [0]
+            for item in xlabels:
+                xlabs.append(item)
+            xlabels = xlabs
+        if ylabels is None:
+            ylabels = df.index
             # ylabels = list(reversed(ylabels))
-            if ylabels[0] != 0:
-                ylabs = [0]
-                for item in ylabels:
-                    ylabs.append(item)
-                ylabels = ylabs
-        else:
-            ylabels = []
+        if ylabels[0] != 0:
+            ylabs = [0]
+            for item in ylabels:
+                ylabs.append(item)
+            ylabels = ylabs
+
+
 
         xticks = ElementParam(locs=1, xlabels=xlabels, offset=0.12, fontsize=8)
         yticks = ElementParam(locs=1, ylabels=ylabels, offset=0.12, fontsize=8)
@@ -1205,7 +1206,7 @@ class PlotData:
             annotations = None
 
         saveto = output
-        return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
+        return cls('heatmap',data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     
     @classmethod
     def barplot(cls, df, labels=None, color='#9bcccc', title=None, xlabel=None, ylabel=None, ymin=0, ymax=10, locs=20, minor_locs=5, xlim=None, annotations=True, output=None):
@@ -1411,9 +1412,9 @@ class PlotData:
                 d = Data(df=df, x=df.index, y=df[column], color=colors[i], label=labels[i])
             i += 1
             data.append(d)
-        # coil = Data(df=df, x=df.index, y=df['coil_percent'], color=colors['coil_percent'], label='Coil')
-        # bsheet = Data(df=df, x=df.index, y=df['bsheet_percent'], color=colors['bsheet_percent'], label=r'$\beta$-Strand')
-        # helix = Data(df=df, x=df.index, y=df['helix_percent'], color=colors['helix_percent'], label='Helix')
+        # coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil')
+        # bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand')
+        # helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix')
         
         fig = None
 

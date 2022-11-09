@@ -5,8 +5,6 @@ import numpy as np
 import os
 import pandas as pd
 import sys
-sys.path.append('/work/cascades/kelsieking23/software/')
-# sys.path.append("D:/Work/")
 from pymd.mdanalysis.ndx import Ndx
 from scipy.spatial import distance_matrix
 
