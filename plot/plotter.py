@@ -179,7 +179,7 @@ class Plotter:
         normal_h = 6
         fig_h = (normal_h * nrows) 
         fig_w = (normal_w * ncols) + 2
-        fig.set_size_inches(fig_w, fig_h)
+        fig.set_size_inches(fig_w*.7, fig_h*.7)
         # gs = GridSpec(ncols=ncols,nrows=nrows)
         _axes = []
         ax_index = 0
@@ -192,55 +192,77 @@ class Plotter:
         rows = []
         i = 0
         row_counter = -1
-        if (nrows > 1) and (ncols > 1):
-            for x in range(0, nrows):
-                row_counter += 1
-                rows.append([])
-                for y in range(0, ncols):
-                    try:
-                        pdata = data[i]
-                        if sharex:
-                            _xlabel = pdata.xlabel.label
-                            pdata.xlabel.label = None
-                        if sharey:
-                            _ylabel = pdata.ylabel.label
-                            pdata.ylabel.label = None
-                    except:
-                        break
-                    if axes == []:
-                        ax[x,y] = self.timeseries(pdata, fig=fig, ax=ax[x,y])
-                        _min_x, _max_x, _min_y, _max_y = self.minmax(ax[x,y].get_xlim(), ax[x,y].get_ylim(), _min_x, _max_x, _min_y, _max_y)
-                        _axes.append(ax[x,y])
-                        rows[row_counter].append(ax[x,y])
-                        i += 1
-                    else:
-                        ax[x,y] = axes[ax_index]
-                        _axes.append(axes[ax_index])
-                        i += 1
-                        ax_index += 1
+        if nrows > 1:
+            indeces = nrows
         else:
-            if nrows > 1:
-                indeces = nrows
+            indeces = ncols
+        for x in range(0, indeces):
+            pdata = data[i]
+            if sharex:
+                _xlabel = pdata.xlabel.label
+                pdata.xlabel.label = None
+            if sharey:
+                _ylabel = pdata.ylabel.label
+                pdata.ylabel.label = None
+            if axes == []:
+                ax.flat[x] = self.timeseries(pdata, fig=fig, ax=ax.flat[x], show=False)
+                _min_x, _max_x, _min_y, _max_y = self.minmax(ax.flat[x].get_xlim(), ax.flat[x].get_ylim(), _min_x, _max_x, _min_y, _max_y)
+                _axes.append(ax.flat[x])
+                i += 1
             else:
-                indeces = ncols
-            for x in range(0, indeces):
-                pdata = data[i]
-                if sharex:
-                    _xlabel = pdata.xlabel.label
-                    pdata.xlabel.label = None
-                if sharey:
-                    _ylabel = pdata.ylabel.label
-                    pdata.ylabel.label = None
-                if axes == []:
-                    ax[x] = self.timeseries(pdata, fig=fig, ax=ax[x], show=False)
-                    _min_x, _max_x, _min_y, _max_y = self.minmax(ax[x].get_xlim(), ax[x].get_ylim(), _min_x, _max_x, _min_y, _max_y)
-                    _axes.append(ax[x])
-                    i += 1
-                else:
-                    ax[x] = axes[ax_index]
-                    _axes.append(axes[ax_index])
-                    i += 1
-                    ax_index += 1
+                ax.flat[x] = axes[ax_index]
+                _axes.append(axes[ax_index])
+                i += 1
+                ax_index += 1
+        # if (nrows > 1) and (ncols > 1):
+        #     for x in range(0, nrows):
+        #         row_counter += 1
+        #         rows.append([])
+        #         for y in range(0, ncols):
+        #             try:
+        #                 pdata = data[i]
+        #                 if sharex:
+        #                     _xlabel = pdata.xlabel.label
+        #                     pdata.xlabel.label = None
+        #                 if sharey:
+        #                     _ylabel = pdata.ylabel.label
+        #                     pdata.ylabel.label = None
+        #             except:
+        #                 break
+        #             if axes == []:
+        #                 ax[x,y] = self.timeseries(pdata, fig=fig, ax=ax[x,y])
+        #                 _min_x, _max_x, _min_y, _max_y = self.minmax(ax[x,y].get_xlim(), ax[x,y].get_ylim(), _min_x, _max_x, _min_y, _max_y)
+        #                 _axes.append(ax[x,y])
+        #                 rows[row_counter].append(ax[x,y])
+        #                 i += 1
+        #             else:
+        #                 ax[x,y] = axes[ax_index]
+        #                 _axes.append(axes[ax_index])
+        #                 i += 1
+        #                 ax_index += 1
+        # else:
+        #     if nrows > 1:
+        #         indeces = nrows
+        #     else:
+        #         indeces = ncols
+        #     for x in range(0, indeces):
+        #         pdata = data[i]
+        #         if sharex:
+        #             _xlabel = pdata.xlabel.label
+        #             pdata.xlabel.label = None
+        #         if sharey:
+        #             _ylabel = pdata.ylabel.label
+        #             pdata.ylabel.label = None
+        #         if axes == []:
+        #             ax[x] = self.timeseries(pdata, fig=fig, ax=ax[x], show=False)
+        #             _min_x, _max_x, _min_y, _max_y = self.minmax(ax[x].get_xlim(), ax[x].get_ylim(), _min_x, _max_x, _min_y, _max_y)
+        #             _axes.append(ax[x])
+        #             i += 1
+        #         else:
+        #             ax[x] = axes[ax_index]
+        #             _axes.append(axes[ax_index])
+        #             i += 1
+        #             ax_index += 1
 
         import matplotlib.lines as mlines
         if (legend_data is not None):
@@ -258,18 +280,18 @@ class Plotter:
             # plt.legend(handles=handles, bbox_to_anchor=(-0.81, -0.15, 1.6, .102), loc='lower left',
             # ncol=3, mode="expand", borderaxespad=0.)
 
-        # fix axes?
-        for ax_ in _axes:
-            ax_.set_xlim(_min_x, _max_x)
-            ax_.set_ylim(_min_y, _max_y)
+        # # fix axes?
+        # for ax_ in _axes:
+        #     ax_.set_xlim(_min_x, _max_x)
+        #     ax_.set_ylim(_min_y, _max_y)
         
         if sharex:
-            for _ax in rows[-1]:
-                _ax.set_xlabel(_xlabel, fontsize=pdata.xlabel.fontsize)
+            ax.flat[-1].set_xlabel(_xlabel, fontsize=pdata.xlabel.fontsize)
         if sharey:
             for row in rows:
                 print(_ylabel)
                 row[0].set_ylabel(_ylabel, fontsize=pdata.ylabel.fontsize)
+
         # if (len(data) % 2) != 0:
         #     ax[h-1,w-1].remove()
         # layout
@@ -773,6 +795,19 @@ class Plotter:
         if output.endswith('svg'):
             plt.savefig(output)
         print('Plotted {}'.format(output))
+
+    def panel(self, axes, nrows, ncols, output, show=True):
+        '''
+        general panel function for pre-plotted axes
+        '''
+        fig, axs = plt.subplots(nrows, ncols)
+        for i, ax in enumerate(axs.flat):
+            axs[i] = axes[i]
+        plt.savefig(output, dpi=300)
+        if show:
+            if not sys.platform == 'linux':
+                plt.show()
+
 
     def histogram(self, pdata, show=True):
         fig, ax = plt.subplots()

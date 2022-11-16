@@ -125,8 +125,13 @@ class Run:
         return self.system
 
     def cluster(self, inp, top, job_name='cluster', output='cluster.csv', selection='backbone', stride=100, b=0, e=-1, cutoff=0.2, n_clusters=None,
-                nprocs=12, method='kmeans', linkage='ward', distance_threshold=45, reduce='pca', scale=True, verbose=False, **kwargs):
+                nprocs=12, method='kmeans', linkage='ward', distance_threshold=45, reduce='pca', scale=True, verbose=False,
+                eps=0.5, min_samples=5, metric='euclidean', **kwargs):
+        if (not isinstance(n_clusters, (tuple, list))):
+            n_clusters = [n_clusters] * len(self.system._reps)
+        counter = 0
         for rep in self.system._reps:
+            print(n_clusters, n_clusters[counter])
             i = os.path.join(rep.root, inp)
             t = os.path.join(rep.root, top)
             clust = Cluster(i, t, selection=selection, stride=stride, b=b, e=e, cutoff=cutoff, verbose=verbose)
@@ -147,20 +152,26 @@ class Run:
                 'linkage':linkage,
                 'distance_threshold':distance_threshold,
                 'reduce':reduce,
-                'scale':scale
+                'scale':scale,
+                'eps':eps,
+                'min_samples':min_samples,
+                'metric':metric
                 
             }
             clust.job_params = job_params
             clust.run(nprocs, o)
-            if reduce == 'pca':
+            if (reduce == 'pca') and (method != 'dbscan'):
                 clust.pca()
             if method == 'kmeans':
-                clust.kmeans(n_clusters=n_clusters, output=None)
+                clust.kmeans(n_clusters=n_clusters[counter], output=None)
             if method == 'agglomerative':
-                clust.agglomerative(n_clusters=n_clusters, linkage=linkage, distance_threshold=distance_threshold)
+                clust.agglomerative(n_clusters=n_clusters[counter], linkage=linkage, distance_threshold=distance_threshold)
             if method == 'gromos':
                 clust.gromosCluster()
+            if method == 'dbscan':
+                clust.dbscan(eps=eps, min_samples=min_samples, metric=metric)
             clust.writePDB()
+            counter += 1
             # rep.cluster.analyze = clust.analyze
 
     def dssp(self, inp, top, job_name='dssp', method='time',output='dssp.xvg', selection='backbone', stride=100, block_average=0, b=0, e=-1):

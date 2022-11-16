@@ -37,13 +37,17 @@ class RMSD:
         total_sqd = 0
         if reference is None:
             reference = self.reference
-        rmsd = np.linalg.norm(frame-reference) / frame.shape[0]
-        if self.binary:
-            if rmsd > self.cutoff:
-                return rmsd
-            else:
-                return 0
-        return rmsd
+        return np.sqrt((np.linalg.norm(frame-reference)**2)/frame.shape[0])
+        # for i in range(0, frame.shape[0]):
+        #     total_sqd += self.squareDist(frame[i], reference[i])
+        # return np.sqrt(total_sqd / frame.shape[0])
+        # rmsd = np.linalg.norm(frame-reference) / frame.shape[0]
+        # if self.binary:
+        #     if rmsd > self.cutoff:
+        #         return rmsd
+        #     else:
+        #         return 0
+        # return rmsd
     
     def rmsdOverTime(self, frames = None, reference = None):
         if frames is None:

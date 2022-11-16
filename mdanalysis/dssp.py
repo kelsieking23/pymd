@@ -29,6 +29,7 @@ class DSSP(Analysis):
         self.test = 0
     
     def dsspOverTime(self) -> pd.DataFrame:
+        print('Calculating DSSP over time for {}'.format(self.parent.id))
         if self.traj is None:
             raise ValueError('Trajectory not loaded')
         assignments = mdtraj.compute_dssp(self.traj, simplified=True)
@@ -124,6 +125,7 @@ class DSSP(Analysis):
             f.write(fmt)
             i += 1
         f.close()
+        print('Wrote {}'.format(self.output))
 
     # def loadTrajectory(self, stride=100, selection='backbone', b=0, e=-1):
     #     if stride != 0:

@@ -52,6 +52,8 @@ class Cluster:
         self._log = None
         self.verbose = verbose
         self.method = None
+        self.fig = None
+        self.ax = None
 
 
     @staticmethod
@@ -139,7 +141,6 @@ class Cluster:
                 }
                 partitions.append(data)
                 break
-        print(partitions)
         return partitions
     
     def run(self, nprocs, output):
@@ -293,10 +294,10 @@ class Cluster:
         self.y = km.fit_predict(self.X)
         self.centroids = km.cluster_centers_
         if output is not None:
-            self.plotClusters(title=title, output=output)
+            self.plotClusters(title='{}\nK = {}'.format(self.parent.name, n_clusters), output=output)
         else:
-            output = os.path.join(self.root, 'kmeans.n{}.png'.format(n_clusters))
-            self.plotClusters(title=title, output=output)
+            output = os.path.join(self.root, 'kmeans.png')
+            self.plotClusters(title='{}\nK = {}'.format(self.parent.name, n_clusters), output=output)
         self.argmins, _ = pairwise_distances_argmin_min(km.cluster_centers_, self.X)
         log.write('K-means clustering complete.\n\n')
         if self.verbose:
@@ -326,6 +327,18 @@ class Cluster:
         # print(self.n_clusters)
         # plt.scatter(self.X[:,0],self.X[:,1], c=wa.labels_, cmap='rainbow')
         # plt.savefig(output)
+
+
+    def dbscan(self, eps=0.5, min_samples=5, metric='euclidean'):
+        d = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed')
+        self.X = self.df.to_numpy()
+        self.y = d.fit_predict(self.X)
+        self.centroids = self.getCentroids()
+        output = os.path.join(self.root, 'dbscan.png')
+        title='{}\nN = {}'.format(self.parent.name, len(self.centroids.keys()))
+        output = os.path.join(self.root, 'dbscan.png')
+        self.plotClusters(title=title, output=output)
+        self.method = 'dbscan'
 
     def gromosCluster(self, filepath=None, prefix=None, cutoff=0.15):
         if prefix is not None:
@@ -419,7 +432,7 @@ class Cluster:
 
     def findK(self):
         distortions = []
-        for i in range(1, 11):
+        for i in range(1, 21):
             print('Finding disortions for {}...'.format(i))
             km = KMeans(
                 n_clusters=i, init='k-means++',
@@ -428,7 +441,8 @@ class Cluster:
             )
             km.fit(self.X)
             distortions.append(km.inertia_)
-        plt.plot(range(1, 11), distortions, marker='o', color='tab:blue')
+        plt.plot(range(1, 21), distortions, marker='o', color='tab:blue')
+        plt.xticks([i for i in range(1,21)])
         plt.title('Distortion', weight='bold', fontsize=22)
         plt.xlabel('Number of clusters', fontsize=14, weight='bold')
         plt.ylabel('Distortion', fontsize=14, weight='bold')
@@ -478,8 +492,8 @@ class Cluster:
                     plt.scatter(self.centroids[key][0], self.centroids[key][1],
                     s=250, marker='*', c='yellow', edgecolor='black'
                 )
-        if legend:
-            plt.legend(scatterpoints=1)
+        # if legend:
+        #     plt.legend(scatterpoints=1,fontsize=10)
         plt.title(title, weight='bold', fontsize=22)
         if not sys.platform == 'linux':
             if output is not None:
@@ -496,6 +510,10 @@ class Cluster:
                 plt.savefig('{}_kmeans.png'.format(prefix))
             else:
                 plt.savefig(output)
+        self.fig = fig
+        self.ax = ax
+        self.parent.fig = fig
+        self.parent.ax = ax
         plt.close()
 
     def getCentralStructureIndices(self, df):
@@ -564,7 +582,6 @@ class Cluster:
         k = 0
         # _centroid is index in trajectory, d is # of members in cluster
         for _centroid, d in self.getCentralStructureIndices(df):
-            print(_centroid, d)
             frame = traj._xyz[_centroid]
             chain_index = 0
             chain_id = 'A'

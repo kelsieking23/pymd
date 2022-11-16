@@ -24,10 +24,15 @@ class Subsystem(PostProcess):
         #     self.__dict__.update(dict)
         if parent is not None:
             self.parent = parent
+            self.name = self.parent.name
+        else:
+            self.name = self.id
         self.traj = None
         self._traj = None
         self._tu = tu
         self.plotter = Plotter()
+        self.fig = None
+        self.ax = None
     
     @classmethod
     def from_dict(cls, dic, parent):
@@ -81,6 +86,8 @@ class Subsystem(PostProcess):
             self.dssp = DSSP.from_json(os.path.join(self.root, job_name), parent=self)
             self.df = self.dssp.df
             self.data = self.dssp.df
+        if self.parent is not None:
+            self.parent.job = self.job
         return self
 
     def load_trajectory(self, stride=1, selection='all', b=0, e=-1):
@@ -129,16 +136,20 @@ class Subsystem(PostProcess):
         if df is None:
             df = self.df
         if ptype == 'infer':
+            print(df.attrs)
             if 'ptype' in df.attrs.keys():
                 ptype = df.attrs['ptype']
-                if ptype is None:
-                    if 'type' in df.attrs.keys():
-                        if df.attrs['type'] == 'xy':
-                            ptype = 'timeseries'
+                print(ptype)
             else:
-                if 'type' in df.attrs.keys():
-                    if df.attrs['type'] == 'xy':
-                        ptype = 'timeseries'
+                ptype = None
+            #     if ptype is None:
+            #         if 'type' in df.attrs.keys():
+            #             if df.attrs['type'] == 'xy':
+            #                 ptype = 'timeseries'
+            # else:
+            #     if 'type' in df.attrs.keys():
+            #         if df.attrs['type'] == 'xy':
+            #             ptype = 'timeseries'
         if ptype == 'timeseries':
             pdata = PlotData.timeseries(df, output=output, **kwargs)
             self.plotter.timeseries(pdata, show=show)
@@ -151,7 +162,7 @@ class Subsystem(PostProcess):
         else:
             raise ValueError('no valid type')
 
-    def plot_with(self, systems, ptype='infer', output=None, show=True, **kwargs):
+    def plot_with(self, systems, ptype='infer', nrows=1, ncols=1, sharex=True, sharey=True, output=None, show=True, **kwargs):
         pdatas = []
         if ptype == 'infer':
             if 'ptype' in self.df.attrs.keys():
@@ -170,6 +181,12 @@ class Subsystem(PostProcess):
             pdatas.append(PlotData.dsspOverTime(self.df, output=output, **kwargs))
             for system in systems:
                 pdatas.append(PlotData.dsspOverTime(system.df, **kwargs))
-            self.plotter.timeseries(pdata, show=show)
+            self.plotter.timeseriesPanel(pdatas, ncols=ncols, nrows=nrows, sharex=sharex, sharey=sharey, show=show)
+        elif ptype == 'cluster':
+            axes = []
+            axes.append(self.ax)
+            for system in systems:
+                axes.append(system.ax)
+            self.plotter.panel(axes=axes, nrows=nrows, ncols=ncols, output=output, show=show)
         else:
             raise ValueError('no valid type')

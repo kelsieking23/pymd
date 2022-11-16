@@ -5,11 +5,13 @@ import sys
 
 from pymd.core.subsystem import Subsystem
 from pymd.plot.plotter import Plotter, SystemPlot
+from pymd.plot.data import PlotData
 from pymd.mdanalysis.postprocess import PostProcess
 from pymd.mdanalysis.systemanalysis import SystemAnalysis
 from pymd.structure.protein import Protein
 from pymd.mdrun.run import Run
 from pymd.mdanalysis.cluster import Cluster
+
 
 class System:
     '''
@@ -51,6 +53,9 @@ class System:
             self.protein = Protein(structure=protein)
         self.job_params = None
         self.job = None
+        self._df = pd.DataFrame()
+        self.data = pd.DataFrame()
+        self.plotter = Plotter()
         # self.analyze = Analyzer(self)
     
     @staticmethod
@@ -330,6 +335,15 @@ class System:
             directory[rep][location][dtype]['data'] = data
         return directory
         
+    @property
+    def df(self):
+        return self._df
+    
+    @df.setter
+    def df(self, d):
+        self._df = d
+        self._df.attrs = d.attrs
+        return self._df
 
     def setupDirOther(self,directory,rep,location):
         path = os.path.join(directory[rep]['root'], location)
@@ -373,8 +387,96 @@ class System:
             return self.cluster
 
 
-    
-    
+    def average(self, by='all', std=True):
+        dfs = []
+        for rep in self._reps:
+            if (rep.df is None) or (rep.df.empty):
+                raise ValueError('{} has no data. A job must be loaded')
+            dfs.append(rep.df)
+        if (by == 0) or (by == 'index'):
+            df = pd.concat(dfs, axis=1).mean(axis=1)
+        else:
+            # plot average overall
+            df = pd.concat(dfs).groupby(level=0).mean()
+        if std:
+            if (by == 0) or (by == 'index'):
+                _std = pd.concat(dfs, axis=1).std()
+            else:
+                _std = pd.concat(dfs).groupby(level=0).std()
+            for col in _std.columns:
+                df['{}_std'.format(col)] = _std[col]
+        df.attrs = dfs[-1].attrs
+        self.df = df
+        return self.df
+
+    def plot(self, ptype='infer', df = None, output=None, show=True, **kwargs):
+        # this needs to create a plotdata object or something
+        if df is None:
+            df = self.df
+        if ptype == 'infer':
+            if 'ptype' in df.attrs.keys():
+                ptype = df.attrs['ptype']
+                print(ptype)
+            else:
+                ptype = None
+            #     if ptype is None:
+            #         if 'type' in df.attrs.keys():
+            #             if df.attrs['type'] == 'xy':
+            #                 ptype = 'timeseries'
+            # else:
+            #     if 'type' in df.attrs.keys():
+            #         if df.attrs['type'] == 'xy':
+            #             ptype = 'timeseries'
+        if ptype == 'timeseries':
+            pdata = PlotData.timeseries(df, output=output, **kwargs)
+            self.plotter.timeseries(pdata, show=show)
+        elif ptype == 'heatmap':
+            pdata = PlotData.heatmap(df, output=output, **kwargs)
+            self.plotter.heatmap(pdata, show=show)
+        elif ptype == 'dssp':
+            pdata = PlotData.dsspOverTime(df, output=output, **kwargs)
+            self.plotter.timeseries(pdata, show=show)
+        else:
+            raise ValueError('no valid type')
+
+    def plot_with(self, systems, ptype='infer', nrows=1, ncols=1, sharex=True, sharey=True, output=None, show=True, title=None, **kwargs):
+        pdatas = []
+        if ptype == 'infer':
+            if 'ptype' in self.df.attrs.keys():
+                ptype = self.df.attrs['ptype']
+        if ptype == 'timeseries':
+            pdatas.append(PlotData.timeseries(self.df, **kwargs))
+            for system in systems:
+                pdatas.append(PlotData.timeseries(system.df, **kwargs))
+            self.plotter.timeseries(pdatas, show=show)
+        elif ptype == 'heatmap':
+            pdatas.append(PlotData.heatmap(self.df, **kwargs))
+            for system in systems:
+                pdatas.append(PlotData.heatmap(system.df, **kwargs))
+            self.plotter.heatmap(pdatas, show=show, output=output)
+        elif ptype == 'dssp':
+            if title == 'name':
+                _title = self.name
+            else:
+                _title = title
+            pdatas.append(PlotData.dsspOverTime(self.df, output=output, title=_title,**kwargs))
+            for system in systems:
+                if title == 'name':
+                    _title = system.name
+                else:
+                    _title = title
+                pdatas.append(PlotData.dsspOverTime(system.df, title=_title, **kwargs))
+            self.plotter.timeseriesPanel(pdatas, ncols=ncols, nrows=nrows, sharex=sharex, sharey=sharey, show=show, output=output)
+        elif ptype=='cluster':
+            axes = []
+            for rep in self._reps:
+                axes.append(rep.ax)
+            for system in systems:
+                for rep in system._reps:
+                    axes.append(rep.ax)
+            self.plotter.panel(axes=axes, nrows=nrows, ncols=ncols, output=output, show=show)
+        else:
+            raise ValueError('no valid type')
 # directory = self.setupDirBasic(directory, rep, 'rmsf')
 # directory = self.setupDirBasic(directory, rep, 'dssp')
 # directory = self.setupDirBasic(directory, rep, 'clusters')

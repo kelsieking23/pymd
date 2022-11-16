@@ -10,8 +10,9 @@ import pandas as pd
 from statistics import mean
 from collections.abc import Iterable
 from sklearn.preprocessing import StandardScaler
+from pymd.mdanalysis.analysis import Analysis
 
-class Distance:
+class Distance(Analysis):
 
     def __init__(self, inp, top, parent=None, **kwargs):
         '''
@@ -20,7 +21,7 @@ class Distance:
         self.parent = parent
         self._inp = inp
         self._topfile = top
-        self.top = None
+        # self.top = None
         self.traj = None
         self._traj = None
         self.stride = 1
@@ -38,137 +39,6 @@ class Distance:
         self._iterload = False
         self.matrix = pd.DataFrame()
         self.__dict__.update(kwargs)
-        if self._iterload:
-            self.iterload(self.stride)
-
-    def save(self):
-        params = {}
-        manual_keys = ['parent', 'df', 'matrix']
-        for key, value in self.__dict__.items():
-            if key not in manual_keys:
-                params[key] = value
-        filename = os.path.join(self.root, 'job_params.json')
-        with open(filename, 'w') as f:
-            params_dict = json.dumps(params)
-            f.write(params_dict)
-
-    @classmethod
-    def from_json(cls, path, inp=None, top=None, parent=None):
-        with open(os.path.join(path, 'job_params.json'), 'r') as f:
-            params = json.load(f)
-        dic = {}
-        manual_keys = ['inp', 'top', 'parent', 'df', 'matrix']
-        for key, value in params.items():
-            if key not in manual_keys:
-                dic[key] = value
-        for filename in os.listdir(path):
-            if filename.endswith('csv'):
-                dic['df'] = pd.read_csv(os.path.join(path, filename), index_col=0)
-        if parent is not None:
-            inp = parent.inp
-            top = parent.topfile
-        return cls(inp, top, parent, **dic)
-
-    @property
-    def inp(self):
-        if self.parent is not None:
-            return os.path.join(self.parent.root, self._inp)  # type: ignore
-        return self._inp
-
-    @property
-    def topfile(self):
-        if self.parent is not None:
-            return os.path.join(self.parent.root, self._topfile)  # type: ignore
-        return self._topfile
-    
-    @property
-    def output(self):
-        if self.parent is not None:
-            if not os.path.isdir(os.path.join(self.parent.root, self.job_name)): # type: ignore
-                os.mkdir(os.path.join(self.parent.root, self.job_name)) # type: ignore
-            if self.compress:
-                self._output = os.path.splitext(self._output)[0] + '.npy' # type: ignore
-            return os.path.join(self.parent.root, self.job_name, self._output) # type: ignore
-        return self._output
-    
-    @property
-    def root(self):
-        if self.parent is not None:
-            return os.path.join(self.parent.root, self.job_name)
-        else:
-            return os.path.join(os.getcwd(), self.job_name)
-    
-    def load(self, stride=None):
-        if stride is not None:
-            if stride != 0:
-                traj = mdtraj.load(self.inp, top=self.topfile, stride=stride)
-            else:
-                traj = mdtraj.load(self.inp, top=self.topfile)
-        else:
-            if self.stride != 0:
-                traj = mdtraj.load(self.inp, top=self.topfile, stride=self.stride)
-            else:
-                traj = mdtraj.load(self.inp, top=self.topfile)
-        traj = traj.superpose(traj)
-        self._traj = traj
-        if (self.e == -1):
-            self.traj = traj.center_coordinates()[self.b:]
-        else:
-            self.traj = traj.center_coordinates()[self.b:self.e]
-        if self.selection != 'all':
-            sele = self.traj.top.select(self.selection)
-            self.traj = self.traj.atom_slice(sele)
-        self.frames = self.traj._xyz
-        self.top = self.traj.top
-        return self
-
-    def iterload(self, stride=None):
-        if stride is not None:
-            if stride != 0:
-                traj = mdtraj.iterload(self.inp, top=self.topfile, stride=stride)
-            else:
-                traj = mdtraj.iterload(self.inp, top=self.topfile)
-        else:
-            if self.stride != 0:
-                traj = mdtraj.iterload(self.inp, top=self.topfile, stride=self.stride)
-            else:
-                traj = mdtraj.iterload(self.inp, top=self.topfile)
-        self.traj = traj
-        self._traj = traj
-        if self.selection != 'all':
-            sele = self.traj.top.select(self.selection)
-            self.traj = self.traj.atom_slice(sele)
-        self.top = self.traj.top
-        return self
-
-    def getPartitions(self):
-        if self.nprocs == 'auto':
-            nprocs = int(mp.cpu_count() // 2)
-        else:
-            nprocs = self.nprocs
-        if self.traj is None:
-            self.load()
-        nframes, _, _ = self.traj._xyz.shape # type: ignore
-        interval = int(nframes // nprocs)
-        partitions = []
-        procid=1
-        for i in range(0, nframes, interval):
-            data = {
-                'b':i,
-                'e':i+interval,
-                'procid':procid,
-            }
-            partitions.append(data)
-            procid+=1
-            if ((i + interval + interval) > nframes) and (i+interval != nframes):
-                data = {
-                    'b':i+interval,
-                    'e':nframes,
-                    'procid':procid
-                }
-                partitions.append(data)
-                break
-        return partitions, nprocs
 
     @staticmethod
     def atom_pairs(sele_indices, excluded_neighbors = 2):
@@ -210,8 +80,8 @@ class Distance:
         return np.array(p)
 
     def run(self, method='residue', output='dist.csv', **kwargs):
+        self._output = output
         self.save()
-        self.load(self.stride)
         if method == 'atom':
             df = self.by_atom()
             return df
@@ -235,14 +105,17 @@ class Distance:
             np.save(self.output, distances)
         return self.df
     
-    def by_residue(self, contact_pairs, **kwargs):
+    def by_residue(self, contact_pairs, squareform=False, **kwargs):
         if self.parent is not None:
             print('Computing residue contacts for {}...'.format(self.parent.id))
         distances, pairs = mdtraj.compute_contacts(self.traj, contacts=contact_pairs, **kwargs) # type: ignore
+        # sq = mdtraj.geometry.squareform(distances, pairs)
         distances = pd.DataFrame(distances)
         pairs = pd.DataFrame(pairs)
         distances.columns = ['{}_{}'.format(pairs.loc[index,0], pairs.loc[index, 1]) for index in pairs.index]  # type: ignore
         self.df = distances
+        # if squareform:
+        #     self.df = sq
         if self.output is not None:
             print('Writing {}'.format(self.output))
             print('Shape: {}'.format(self.df.shape))
@@ -314,6 +187,36 @@ class Distance:
         if self.parent is not None:
             self.parent.df = self.matrix
         return self.matrix
+    
+    def frequency(self, cutoff=0.6):
+        df = pd.DataFrame()
+        frequencies = []
+        weighted = pd.DataFrame()
+        for col in self.df.columns:
+            freq = len(self.df[self.df[col] <= cutoff])/len(self.df.index)
+            weighted[col] = self.df[col] * freq
+            # i += 1
+            # if i == 1:
+            #     print(freq)
+            frequencies.append(freq)
+        df['pairs'] = self.df.columns
+        df['frequency'] = frequencies
+        weighted.index = self.df.index
+        self.df = weighted
+        return self.df, df
+    
+    def squareform(self, frames=(0,-1)):
+        pairs = [col.split('_') for col in self.df.columns]
+        pairs = np.array([list(map(int, pair)) for pair in pairs])
+        distances = self.df.loc[frames[0]:frames[-1],:].to_numpy()
+        squares = mdtraj.geometry.squareform(distances, pairs)
+        dfs = []
+        for sq in squares:
+            df = pd.DataFrame(sq, columns=[residue.index for residue in self.top.residues],
+                                index=[residue.index for residue in self.top.residues])
+            dfs.append(df)
+        return dfs
+
 
 
 
