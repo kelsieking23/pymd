@@ -48,8 +48,11 @@ class Analysis:
         params = {}
         manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']
         for key, value in self.__dict__.items():
-            if key not in manual_keys:
-                params[key] = value
+            try:
+                if key not in manual_keys:
+                    params[key] = value
+            except:
+                continue
         filename = os.path.join(self.root, 'job_params.json')
         with open(filename, 'w') as f:
             params_dict = json.dumps(params)
@@ -133,15 +136,17 @@ class Analysis:
             traj = mdtraj.load(self.inp, top=self.topfile)
         traj = traj.superpose(traj)
 
-        self._traj = traj
         if selection != 'all':
             sele = traj.top.select(selection)
             traj = traj.atom_slice(sele)
+
+        self.traj = traj.center_coordinates()
+        self._traj = traj
         if (e == -1):
-            self.traj = traj.center_coordinates()[b:]
+            self.traj = self.traj[b:]
             # self.traj = traj[b:]
         else:
-            self.traj = traj.center_coordinates()[b:e]
+            self.traj = traj[b:e]
             # self.traj = traj[b:e]
         self.stride = stride
         self.selection=selection
@@ -185,11 +190,13 @@ class Analysis:
                 break
         return partitions, nprocs
 
-    def toPDB(self, index, output):
+    def toPDB(self, index, output, remark=None):
         frame = self._traj._xyz[index]
         chain_index = 0
         chain_id = 'A'
         contents = []
+        if remark is not None:
+            contents.append('{}\n'.format(remark))
         for z in range(0, len(frame)):
             atom = self._traj.topology._atoms[z]
             if atom.residue.chain.index > chain_index:

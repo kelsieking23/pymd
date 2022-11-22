@@ -19,7 +19,7 @@ class DSSP(Analysis):
         if 'output' in kwargs.keys():
             self._output = kwargs['output']
         else:
-            self._output = None
+            self._output = 'dssp.xvg'
         self.job_name = 'analysis'
         self.job_params = {}
         self.parent = parent
@@ -51,6 +51,7 @@ class DSSP(Analysis):
         self.save()
 
         return self.df
+
     def calcPercentages(self, assignments: pd.DataFrame) -> np.ndarray:
         a = assignments[assignments != 'NA']
         # alpha

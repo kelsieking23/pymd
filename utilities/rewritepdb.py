@@ -453,6 +453,7 @@ def editChainIDResidue(filename, newfilename, nterm, cterm, sm=None):
 
 
 def writePDB(data, newfilename):
+    print(newfilename)
     f = open(newfilename, 'w')
     ter = False
     for line in data:

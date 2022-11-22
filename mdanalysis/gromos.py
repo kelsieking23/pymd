@@ -70,19 +70,23 @@ class GROMOS(Analysis):
                     break
         return partitions
 
-    def run(self, nprocs, output='cluster.csv', stride=100, selection='backbone', b=0, e=-1):
+    def run(self, nprocs, output='cluster.csv', stride=100, selection='backbone', b=0, e=-1, concat=True):
         if self.traj is None:
             self.loadTrajectory(stride=stride, selection=selection, b=b, e=e)
+        # self.save()
         partitions = self.getPartitions(nprocs)
-        for item in partitions:
-            print(item)
         pool = mp.Pool(processes=nprocs)
         results = pool.map(self.matrix, partitions)
         df = pd.concat(results, axis=1)
         df = df.fillna(df.T)
+        if concat:
+            df.index = [i for i in range(len(df.index))]
+            df.columns = [i for i in range(len(df.columns))]
         self.df = df
         output = os.path.join(self.root, output)
+        print(output)
         df.to_csv(output)
+        print(self.df.head())
         return df
 
     def matrix(self, data):
@@ -112,10 +116,13 @@ class GROMOS(Analysis):
     def gromos(self, filepath=None, prefix=None):
         if self.df.empty:
             if prefix is not None:
+                print('from prefix')
                 filename = os.path.join(self.root, '{}.cluster.csv'.format(prefix))
             elif filepath is not None:
+                print('from filepath')
                 filename = filepath
             else:
+                print('from root')
                 filename = os.path.join(self.root, 'cluster.csv')
             self.df = pd.read_csv(filename, index_col=0, header=0)
         df = self.df
@@ -133,6 +140,8 @@ class GROMOS(Analysis):
             last_df = df
         self.central_clusters = central_clusters
         self.n_clusters = n_clusters
+        # print(self.central_clusters)
+        # print(self.n_clusters)
         self.clustsize()
         return central_clusters, n_clusters
 
@@ -174,6 +183,8 @@ class GROMOS(Analysis):
         output = os.path.join(self.root, 'size.csv')
         df.to_csv(output)
         self.size = df
+        print('Cluster data:')
+        print(self.size.head())
     
     def writePDB(self, wcl=5):
         for i in range(0, wcl):

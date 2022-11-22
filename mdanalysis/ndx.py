@@ -131,19 +131,24 @@ class Ndx:
         if '(' in sele:
             sele_string = ''
             subgroups = self.parse_parentheses(sele)
+            print(subgroups)
             for grp in subgroups:
                 if isinstance(grp, list):
                     _sele_string = ''.join(grp)
+                    print(_sele_string)
                     atoms = self.interpret(_sele_string)
                     type_string = sele_in.split()[i]
+                    print(type_string)
                     self.types[type_string] = Type(type_string, atoms)
                     sele_string += type_string
+                    print(sele_string)
                     # parsed.append(_sele_string)
 
                 else:
                     sele_string += grp
             parsed.append(sele_string)
         i += 1
+        print(parsed)
         if parsed == []:
             return sele
         return parsed[0]
@@ -286,6 +291,7 @@ class Ndx:
             'c':[],
             'p':[],
             's':[],
+            'h':[],
             'headgroups':[],
             'headgroups_noh':[]
         }
@@ -383,7 +389,7 @@ class Ndx:
                     if 'n' in atom_name:
                         types['n'].append(atom_num)
                     if 'h' in atom_name:
-                        types['H'].append(atom_num)
+                        types['h'].append(atom_num)
                     if 'c' in atom_name:
                         types['c'].append(atom_num)
                     if 'p' in atom_name:
