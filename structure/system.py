@@ -349,16 +349,28 @@ class System:
 
     def vinaEnergy(self):
         energies = {}
+        energies_per_pose = {}
         for ligand in self.ligands:
+            ligand.getLog()
             energies[ligand.name] = {}
+            energies_per_pose[ligand.name] = {}
             f = open(ligand.log, 'r')
             contents = []
             for line in f:
                 contents.append(line)
-            energy_lines = contents[-10:-1]
+            index = 0
+            for line in contents:
+                if line.startswith('-----'):
+                    break
+                index += 1
+            energy_lines = contents[index+1:-1]
+            # energy_lines = contents[-10:-1]
             f.close()
             vina_energies = []
             for line in energy_lines:
+                # print('"{}"'.format(line.strip()))
+                if line.strip() == '':
+                    continue
                 line_parts = line.split()
                 energy = float(line_parts[1])
                 vina_energies.append(energy)
@@ -371,8 +383,10 @@ class System:
             atom_count = ligand.atomCount(heavy=True)
             le = lowest_energy / atom_count
             energies[ligand.name]['LE_vina'] = le
+            energies_per_pose[ligand.name] = vina_energies
         df = pd.DataFrame(energies)
-        return df
+        df_per_pose = pd.DataFrame(energies_per_pose)
+        return df, df_per_pose.T
             
     
     ######################################################################################
@@ -425,6 +439,12 @@ class System:
                 else:
                     all_contents.append(info)
                     info = []
+            elif line.startswith('Warning!  Your license will expire'):
+                i += 1
+                continue
+            elif line.strip() == 'Predictions for':
+                i += 1
+                continue
             else:
                 info.append(line)
         all_contents.append(info)
@@ -433,7 +453,6 @@ class System:
         drug_standards = {}
         for report in all_contents:
             drug_id = report[0].strip()
-            print(drug_id)
             if drug_id == '':
                 drug_id = report[2].strip()
             # if drug_id not in self.names:

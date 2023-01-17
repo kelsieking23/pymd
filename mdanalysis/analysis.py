@@ -6,6 +6,7 @@ import mdtraj
 from pymd.mdanalysis.postprocess import PostProcess
 import multiprocessing as mp
 from pymd.utilities.rewritepdb import writePDB
+from collections.abc import Iterable
 
 class Analysis:
 
@@ -39,23 +40,21 @@ class Analysis:
 
     @property
     def top(self):
-        if self.traj is not None:
-            return self.traj.topology
-        else:
-            return mdtraj.load(self.topfile).topology
+        return mdtraj.load(self.topfile).topology
 
     def save(self):
         params = {}
         manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']
+        to_dump = {}
         for key, value in self.__dict__.items():
             try:
-                if key not in manual_keys:
-                    params[key] = value
+                json.dumps(value)
+                to_dump[key] = value
             except:
                 continue
         filename = os.path.join(self.root, 'job_params.json')
         with open(filename, 'w') as f:
-            params_dict = json.dumps(params)
+            params_dict = json.dumps(to_dump)
             f.write(params_dict)
         self.job_params = params_dict
 
@@ -109,7 +108,9 @@ class Analysis:
     
     @property
     def output(self):
-        return os.path.join(self.root, self._output) # type: ignore
+        if self._output is not None:
+            return os.path.join(self.root, self._output) # type: ignore
+        return None
         # if self.parent is not None:
         #     if not os.path.isdir(os.path.join(self.parent.root, self.job_name)): # type: ignore
         #         os.mkdir(os.path.join(self.parent.root, self.job_name)) # type: ignore
@@ -135,13 +136,15 @@ class Analysis:
         else:
             traj = mdtraj.load(self.inp, top=self.topfile)
         traj = traj.superpose(traj)
+        self._traj = traj.center_coordinates()
 
         if selection != 'all':
-            sele = traj.top.select(selection)
-            traj = traj.atom_slice(sele)
-
-        self.traj = traj.center_coordinates()
-        self._traj = traj
+            if isinstance(selection, str):
+                sele = self._traj.top.select(selection)
+                traj = self._traj.atom_slice(sele)
+            if isinstance(selection, Iterable):
+                traj = self._traj.atom_slice(selection)
+        self.traj = traj
         if (e == -1):
             self.traj = self.traj[b:]
             # self.traj = traj[b:]
@@ -210,3 +213,9 @@ class Analysis:
 
     def fixCoordinates(self, xyz):
         return xyz*10
+    
+    @staticmethod
+    def chain_conversions():
+        keys = [i for i in range(0,26)]
+        values = list(map(chr, range(ord('A'), ord('Z')+1)))
+        return {k:v for (k,v) in zip(keys, values)}

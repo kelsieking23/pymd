@@ -53,7 +53,7 @@ class PlotData:
     @classmethod
     def timeseries(cls, df, title=None, labels='columns', x_label=None, y_label=None, major_xticks=None, minor_xticks=None, colors=None, output=None, ymin=0.0, ymax=None, 
     legend=False, ncol=1, linewidth=2, average=False, std=False, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
-    legend_fontsize=12, semiopen=True, superlegend=False):
+    legend_fontsize=12, semiopen=True, superlegend=False, alpha=1, grid=False):
         '''
         Arguments:
         df (pandas DataFrame): dataframe containing all the data you want plotted. output of postprocess.getDataFrame
@@ -110,17 +110,22 @@ class PlotData:
 
             # make Data instances and append to data list
             if std is False:
-                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth)
+                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha)
             else:
-                try:
-                    assert average is True
-                    std_df = pd.DataFrame()
-                    std_df['std'] = _df.std(axis=1)
-                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'])
-                except:
-                    if i == 0:
-                        print('WARNING: average must be True for standard deviation to plot. Plotting dataframe containing the following files individually: \n {}'.format(df.name))
-                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth)
+                if 'std' in df.columns:
+                    if column == 'std':
+                        break
+                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha)
+                else:
+                    try:
+                        assert average is True
+                        std_df = pd.DataFrame()
+                        std_df['std'] = _df.std(axis=1)
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha)
+                    except:
+                        if i == 0:
+                            print('WARNING: average must be True for standard deviation to plot. Plotting dataframe containing the following files individually: \n {}'.format(df.name))
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha)
             data.append(d)
 
             i += 1
@@ -165,7 +170,7 @@ class PlotData:
             title = None
 
         # axes
-        axes=ElementParam(off=False, semiopen=semiopen)
+        axes=ElementParam(off=False, semiopen=semiopen, grid=grid)
 
         # annotations
         annotations = None
@@ -201,7 +206,7 @@ class PlotData:
         s = 14900/len(df.index)
         smax = s
         _ymax = None
-        markers = [marker] * len(df)
+        markers = [marker] * len(df.columns)
         last_marker = None
         if colors is None:
             # colors = ['#1f464c', '#2a8a2d', '#8a47b0', '#9bcccc']
@@ -255,8 +260,10 @@ class PlotData:
             i += 1 
             s = s * 0.75
         # tick labels and locations
-        
-        xticks = ElementParam(xmin=df.index[0], xmax=round(df.index[-1]), locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, rotation=rotation)
+        if (isinstance(df.index[-1], int)) or (isinstance(df.index[-1], float)):
+            xticks = ElementParam(xmin=df.index[0], xmax=round(df.index[-1]), locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, rotation=rotation)
+        else:
+            xticks = ElementParam(xmin=0.1, xmax=len(df.index)+0.9, locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, rotation=rotation)
         if ymax is None:
             if _ymax is None:
                 ymax = math.ceil(df.max().max())

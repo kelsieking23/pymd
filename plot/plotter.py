@@ -51,9 +51,9 @@ class Plotter:
             else:
                 linestyle='solid'
             if hasattr(d, 'linewidth'):
-                ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=linestyle, linewidth=d.linewidth)
+                ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=linestyle, linewidth=d.linewidth, alpha=d.alpha)
             else:
-                ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=linestyle)
+                ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=linestyle, alpha=d.alpha)
             if hasattr(d, 'fill_between'):
                 ax.fill_between(d.x, d.y-d.fill_between, d.y+d.fill_between, alpha=0.2, color=d.color)
             p += 1
@@ -172,14 +172,15 @@ class Plotter:
         # print('**************')
         return _min_x, _max_x, _min_y, _max_y
 
-    def timeseriesPanel(self, data, ncols, nrows, title=None, axes=[], sharex=True, sharey=True, output=None, legend=True, legend_data=None, show=True):
+    def timeseriesPanel(self, data, ncols, nrows, title=None, axes=[], sharex=True, sharey=True, 
+                        output=None, legend=True, legend_data=None, show=True, w = 8, scale = 1):
         fig, ax = plt.subplots(nrows, ncols, sharex=sharex, sharey=sharey)
         # fig = plt.figure() 
-        normal_w = 8
+        normal_w = w
         normal_h = 6
         fig_h = (normal_h * nrows) 
         fig_w = (normal_w * ncols) + 2
-        fig.set_size_inches(fig_w*.7, fig_h*.7)
+        fig.set_size_inches((fig_w*.7)*scale, (fig_h*.7)* scale)
         # gs = GridSpec(ncols=ncols,nrows=nrows)
         _axes = []
         ax_index = 0
@@ -309,13 +310,16 @@ class Plotter:
             if show is True:
                 plt.show()
         else:
-            plt.show()
+            if show is True:
+                plt.show()
+        return fig, ax
     
     def markerPlot(self, pdata, fig=None, ax=None, show=True):
 
         # init plot
-        fig, ax = plt.subplots()
-        fig.set_size_inches(10,6)
+        if (fig is None) and (ax is None):
+            fig, ax = plt.subplots()
+            fig.set_size_inches(10,6)
         
         z = 1
         for d in pdata.data:
@@ -325,14 +329,17 @@ class Plotter:
             z += 1
 
         # labels and axes
+        print(pdata.xticks.xmin)
         ax.set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
+        print(pdata.xticks.xmin)
         ax.set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
 
-        xticks, xticklabels = plt.xticks()
-        dx = (xticks[0] - xticks[0]+1)/2
-        print(xticks, '\n', dx)
-        ax.set_xlim(pdata.xticks.xmin-dx, pdata.xticks.xmax+dx)
-        ax.set_xticks(xticks)
+        # xticks, xticklabels = plt.xticks()
+        # dx = (xticks[0] - xticks[0]+1)/2
+        # print(dx)
+        # print(xticks, '\n', dx)
+        # ax.set_xlim(pdata.xticks.xmin-dx, pdata.xticks.xmax+dx)
+        # ax.set_xticks(xticks)
         if (hasattr(pdata.xticks, 'locs')) and (pdata.xticks.locs is not None):
             ax.xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
         # plt.xticks(fontsize=pdata.xticks.fontsize)
@@ -398,7 +405,7 @@ class Plotter:
         if show:
             plt.show()
         plt.close()
-        return pdata.saveto
+        return ax
 
     def markerPlotPanel(self, data, output, title, legend_data=None):
         # init plot

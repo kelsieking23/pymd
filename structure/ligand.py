@@ -52,7 +52,15 @@ class StaticLigand:
             if 'log.txt' in filename:
                 log_path = os.path.join(directory, filename)
                 return log_path
+        return 0
     
+    @property
+    def log(self):
+        if self.getLog() == 0:
+            return None
+        else:
+            return self.getLog()
+
     @property
     def minimum_distance(self):
         return self._minimum_distance
@@ -195,6 +203,13 @@ class Ligand:
         self.coordinates = self.getAtomCoordinates()
         self.covalent_id = None
         # self.log = self.getLog()
+    @property
+    def log(self):
+        if self.getLog() == 0:
+            return None
+        else:
+            return self.getLog()
+            
     def split(self, ignh):
         '''
         Splits structure file into multiple models.
@@ -234,7 +249,7 @@ class Ligand:
         directory = os.path.dirname(self.structure)
         files = os.listdir(directory)
         for filename in files:
-            if 'log.txt' in filename:
+            if 'log' in filename:
                 log_path = os.path.join(directory, filename)
                 return log_path
         return log_path

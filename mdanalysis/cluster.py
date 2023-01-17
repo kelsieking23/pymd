@@ -54,6 +54,7 @@ class Cluster:
         self.method = None
         self.fig = None
         self.ax = None
+        self._root = None
 
 
     @staticmethod
@@ -81,6 +82,8 @@ class Cluster:
     
     @root.setter
     def root(self, root):
+        if not os.path.isdir(root):
+            os.mkdir(root)
         self._root = root
     
     @property
@@ -143,7 +146,7 @@ class Cluster:
                 break
         return partitions
     
-    def run(self, nprocs, output):
+    def run(self, nprocs, output=None, matrix=None):
         log = open(self.log, 'w')
         log.write('Created on: {}\n'.format(self.now()))
         log.write('Created by: pymd.mdanalysis.cluster\n\n')
@@ -173,37 +176,48 @@ class Cluster:
         if self.verbose:
             print('Loading trajectory...')
         self.loadTrajectory()
-        log.write('Beginning RMSD matrix calculation for {}...\n'.format(self.parent.id))
-        if self.verbose:
-            print('Beginning RMSD matrix calculation for {}...'.format(self.parent.id))
-        log.write('Performing {} processes\n'.format(nprocs))
-        partitions = self.getPartitions(nprocs)
-        # for partition in partitions:
-        #     df = self.gromosV2(partition)
-        try:
-            pool = mp.Pool(processes=nprocs)
-            results = pool.map(self.gromos, partitions)
-        except Exception as e:
-            log.write('Process failed.\n{}\n'.format(e))
-            log.write('Terminating.')
-            log.close()
-            print(e)
-            sys.exit(1)
-        log.write('{} processes complete\n'.format(nprocs))
-        if self.verbose:
-            print('{} processes complete for {}'.format(nprocs, self.parent.id))
-        log.write('Concatenating data...\n')
-        df = pd.concat(results, axis=1)
-        df = df.fillna(df.T)
-        log.write('Concatenation complete\n')
+        if matrix is None:
+            log.write('Beginning RMSD matrix calculation for {}...\n'.format(self.parent.id))
+            if self.verbose:
+                print('Beginning RMSD matrix calculation for {}...'.format(self.parent.id))
+            log.write('Performing {} processes\n'.format(nprocs))
+            partitions = self.getPartitions(nprocs)
+            # for partition in partitions:
+            #     df = self.gromosV2(partition)
+            try:
+                pool = mp.Pool(processes=nprocs)
+                results = pool.map(self.gromos, partitions)
+            except Exception as e:
+                log.write('Process failed.\n{}\n'.format(e))
+                log.write('Terminating.')
+                log.close()
+                print(e)
+                sys.exit(1)
+            log.write('{} processes complete\n'.format(nprocs))
+            if self.verbose:
+                print('{} processes complete for {}'.format(nprocs, self.parent.id))
+            log.write('Concatenating data...\n')
+            df = pd.concat(results, axis=1)
+            df = df.fillna(df.T)
+            log.write('Concatenation complete\n')
+        else:
+            log.write('Loading RMSD matrix...\nFilepath {}\n'.format(matrix))
+            if self.verbose:
+                print('Loading RMSD matrix...\nFilepath {}'.format(matrix))
+            df = pd.read_csv(matrix, index_col=0)
+            log.write('Loaded RMSD matrix successfully\n')
+            if self.verbose:
+                print('Loaded RMSD matrix successfully')
         # print(df)
         self.df = df
         # self.analyze = ClusterData(parent=None, dataframe=self.df, n_clusters=None)
-        log.write('Writing .csv to {}...\n'.format(output))
-        # print('writing csv to {}'.format(output))
-        df.to_csv(output)
-        log.write('Writing .csv complete\n')
-        log.write('RMSD matrix calculation complete. End time {}\n\n'.format(self.now()))
+        if output is not None:
+            log.write('Writing .csv to {}...\n'.format(output))
+            # print('writing csv to {}'.format(output))
+            df.to_csv(output)
+            log.write('Writing .csv complete\n')
+        if matrix is None:
+            log.write('RMSD matrix calculation complete. End time {}\n\n'.format(self.now()))
         log.close()
         # print('Done')
         return df
@@ -264,7 +278,7 @@ class Cluster:
         log.close()
         return self.df
 
-    def kmeans(self, n_clusters=None, output=None, title='K-Means'):
+    def kmeans(self, n_clusters=None, output=None, title='K-Means', init='k-means++'):
         if 'cluster.log' not in os.listdir(self.root):
             log = open(self.log, 'w')
         else:
@@ -287,7 +301,7 @@ class Cluster:
         if self.verbose:
             print('N clusters: {}'.format(n_clusters))
         km = KMeans(
-            n_clusters=n_clusters, init='k-means++',
+            n_clusters=n_clusters, init=init,
             n_init=10, max_iter=300,
             tol=1e-04, random_state=0
         )
@@ -473,6 +487,7 @@ class Cluster:
         df = pd.DataFrame(self.X)
         df['labels'] = self.y
         for i in np.unique(self.y):
+            print('Cluster {}'.format(i))
             d = df[df['labels'] == i]
             ax.scatter(d[0], d[1],
                     s=50, edgecolor='black',
@@ -503,7 +518,7 @@ class Cluster:
                     log = open(self.log, 'a')
                 log.write('Plotting {}\n'.format(output))
                 log.close()
-                plt.savefig(output, dpi=300)
+                plt.savefig(output)
             # plt.show()
         else:
             if hasattr(self, 'prefix'):
@@ -617,7 +632,7 @@ class Cluster:
                     chain_index = atom.residue.chain.index
                     chain_id = chr(ord(chain_id) + 1)
                 x, y, z = map(self.fixCoordinates, frame[z])
-                line = ['ATOM', str(atom.index), atom.name, atom.residue.name, chain_id, str(atom.residue.index), x, y, z, '1.00', '0.00', atom.element.symbol]
+                line = ['ATOM', str(atom.index), atom.name, atom.residue.name, chain_id, str(atom.residue.resSeq), x, y, z, '1.00', '0.00', atom.element.symbol]
                 contents.append(line)
             if prefix is None:
                 output = os.path.join(self.root, 'clust{}.pdb'.format(str(k).zfill(2)))

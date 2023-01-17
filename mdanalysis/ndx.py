@@ -19,10 +19,10 @@ class Ndx:
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
         types = self.getTypes(self.ndxt_groups, ligands)
-        self.types = {}
-        for key in types.keys():
-            self.types[key] = Type(key, types[key])
-        self.selections = {}
+        # self.types = {}
+        # for key in types.keys():
+        #     self.types[key] = Type(key, types[key])
+        # self.selections = {}
 
     @property
     def residues(self):
@@ -539,8 +539,8 @@ class Ndx:
         self.types = types      
         return types
     
-    def makeNDX(self, filename):
-        lines = self.writeLines(self.selections)
+    def makeNDX(self, filename, indeces):
+        lines = self.writeLines(indeces)
         f = open(filename, 'w')
         for line in lines:
             f.write(line)

@@ -1,10 +1,14 @@
 import os
 import sys
 import mdtraj
+import matplotlib 
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 import numpy as np
 import pandas as pd
 from pymd.mdanalysis.analysis import Analysis
 from pymd.mdanalysis.postprocess import PostProcess
+from pymd.plot.utils import create_colormap
 from typing import Optional, Any
 import warnings
 
@@ -19,8 +23,8 @@ class DSSP(Analysis):
         if 'output' in kwargs.keys():
             self._output = kwargs['output']
         else:
-            self._output = 'dssp.xvg'
-        self.job_name = 'analysis'
+            self._output = 'dssp.csv'
+        self.job_name = 'dssp'
         self.job_params = {}
         self.parent = parent
         self.df = pd.DataFrame()
@@ -29,7 +33,10 @@ class DSSP(Analysis):
         self.test = 0
     
     def dsspOverTime(self) -> pd.DataFrame:
-        print('Calculating DSSP over time for {}'.format(self.parent.id))
+        if self.parent is not None:
+            print('Calculating DSSP over time for {}'.format(self.parent.id))
+        else:
+            print('Calculating DSSP over time')
         if self.traj is None:
             raise ValueError('Trajectory not loaded')
         assignments = mdtraj.compute_dssp(self.traj, simplified=True)
@@ -52,6 +59,82 @@ class DSSP(Analysis):
 
         return self.df
 
+    def dsspPerResidue(self, replicate_average=True, interval=1000, system_average=False):
+        if self.traj is None:
+            raise ValueError('Trajectory not loaded')
+        self.save()
+        assignments = mdtraj.compute_dssp(self.traj, simplified=True)
+        df = pd.DataFrame(assignments)
+        encoded = self.ssEncoder(df)
+        self.df = encoded.T
+        if replicate_average:
+            dfs = []
+            for i in range(0, self.traj.n_frames, interval):
+                _df = self.df.loc[:,i:i+interval]
+                _df.columns = [i for i in range(len(_df.columns))]
+                _df.index = [i for i in range(len(_df.index))]
+                dfs.append(_df)
+            self.df = pd.concat(dfs).groupby(level=0).mean()
+        labels = []
+        for residue in self.top.residues:
+            label = '{}{}_{}'.format(residue.name, residue.resSeq, residue.chain.index)
+            labels.append(label)
+        self.df.index = labels
+        self.df.to_csv(self.output)
+        return self.df
+    
+    def plotPerResidue(self, df=None, chain_average=False, output='dssp.perresidue.png', colorbar=True, nrows=1, ncols=1):
+        fig, axes = plt.subplots(nrows, ncols, constrained_layout=True)
+        normal_w = 8
+        normal_h = 6
+        fig_h = (normal_h * nrows) 
+        fig_w = (normal_w * ncols) + 2
+        fig.set_size_inches(fig_w*.7, fig_h*.7)
+        if df is None:
+            df = self.df.T
+        else:
+            df = df.T
+        cmap = create_colormap(((255,255,255),(33,52,104),(246,140,62)), bit=True)
+        k = 0
+        ims = []
+        for chain, ax in zip(self.top.chains, axes.flat):
+            chain = [col for col in df.columns if col.endswith(str(chain.index))]
+            x = df[chain].T
+
+            im = ax.imshow(x, aspect='auto', cmap = cmap, vmin=0, vmax=1)
+            ax.yaxis.set_major_locator(MultipleLocator(4))
+            ax.yaxis.set_minor_locator(MultipleLocator(1))
+            ax.set_yticklabels([i for i in range(-3,42,4)])
+            # ax.xaxis.set_major_locator(MultipleLocator(len(df.columns)*0.2))
+            # ax.xaxis.set_minor_locator(MultipleLocator(len(df.columns)*0.02))
+            xlabels = []
+            for n in range(-200,1001,200):
+                xlabels.append(n)
+            for m in range(0,2):
+                for n in range(0,1001,200):
+                    xlabels.append(n)
+            ax.set_xticklabels(xlabels)
+            ax.set_title('Peptide {}'.format(k+1))
+            ax.set_xlabel('Time (ns)')
+            ax.set_ylabel('Residue')
+            k += 1
+        if colorbar:
+            fig.colorbar(im, ax=axes.ravel().tolist())
+        # fig.subplots_adjust(right=0.8)
+        # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        # fig.colorbar(im, cax=cbar_ax)
+        # plt.tight_layout()
+        
+        o = os.path.join(self.root, output)
+        plt.savefig(o, dpi=300)
+        if not sys.platform == 'linux':
+            plt.show()
+        return fig, axes
+
+    def ssEncoder(self, df):
+        df = df.replace(['C','E','H'], [0,2,1])
+        return df
+    
     def calcPercentages(self, assignments: pd.DataFrame) -> np.ndarray:
         a = assignments[assignments != 'NA']
         # alpha

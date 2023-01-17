@@ -124,7 +124,7 @@ class Run:
         # self.system.update(results)
         return self.system
 
-    def cluster(self, inp, top, job_name='cluster', output='cluster.csv', selection='backbone', stride=100, b=0, e=-1, cutoff=0.2, n_clusters=None,
+    def cluster(self, inp, top, job_name='cluster', output='cluster.csv', matrix=None, selection='backbone', stride=100, b=0, e=-1, cutoff=0.2, n_clusters=None,
                 nprocs=12, method='kmeans', linkage='ward', distance_threshold=45, reduce='pca', scale=True, verbose=False,
                 eps=0.5, min_samples=5, metric='euclidean', **kwargs):
         if (not isinstance(n_clusters, (tuple, list))):
@@ -135,7 +135,10 @@ class Run:
             i = os.path.join(rep.root, inp)
             t = os.path.join(rep.root, top)
             clust = Cluster(i, t, selection=selection, stride=stride, b=b, e=e, cutoff=cutoff, verbose=verbose)
-            o = os.path.join(rep.root, job_name, output)
+            if output is not None:
+                o = os.path.join(rep.root, job_name, output)
+            else:
+                o = None
             if not os.path.isdir(os.path.join(rep.root, job_name)):
                 os.mkdir(os.path.join(rep.root, job_name))
             clust.parent = rep
@@ -159,7 +162,12 @@ class Run:
                 
             }
             clust.job_params = job_params
-            clust.run(nprocs, o)
+            if matrix is not None:
+                print('lol')
+                matrix_path = os.path.join(rep.root, matrix, 'cluster.csv')
+                clust.run(nprocs, o, matrix_path)
+            else:
+                clust.run(nprocs, o)
             if (reduce == 'pca') and (method != 'dbscan'):
                 clust.pca()
             if method == 'kmeans':

@@ -2,6 +2,7 @@ import os
 import types
 import pandas as pd
 import mdtraj
+import re
 
 from pymd.mdanalysis.postprocess import PostProcess
 from pymd.mdanalysis.cluster import Cluster
@@ -26,6 +27,7 @@ class Subsystem(PostProcess):
             self.parent = parent
             self.name = self.parent.name
         else:
+            self.parent = None
             self.name = self.id
         self.traj = None
         self._traj = None
@@ -61,7 +63,7 @@ class Subsystem(PostProcess):
         else:
             return self._tu
 
-    def load(self, job_name, select=-1):
+    def load(self, job_type, job_name, select=-1):
         self.job = job_name
         for file in os.listdir(self.root):
             ext = os.path.splitext(file)[-1][1:]
@@ -70,25 +72,75 @@ class Subsystem(PostProcess):
                 self.files[ext] = []
             self.files[ext].append(os.path.join(self.root, file))
             if (ext == 'csv') or (ext == 'xvg'):
-                if base == job_name:
-                    self.df = self.getDataFrame(os.path.join(self.root, file))
-        if 'cluster' in job_name:
-            pass
+                self.df = self.getDataFrame(os.path.join(self.root, file))
+        self.job = job_type.from_json(os.path.join(self.root, job_name), parent=self)
+        self.df = self.job.df
+        if self.parent is not None:
+            self.parent.job = self.job
+        # if 'cluster' in job_name:
+        #     pass
             # self.cluster = Cluster(self.inp, self.topfile)
             # self.cluster.df = self.df
             # self.cluster.root = os.path.join(self.root, job_name)
             # self.cluster
-        if 'dist' in job_name:
-            self.dist = Distance.from_json(os.path.join(self.root, job_name), parent=self)
-            self.df = self.dist.df
-            self.data = self.dist.df
-        if 'dssp' in job_name:
-            self.dssp = DSSP.from_json(os.path.join(self.root, job_name), parent=self)
-            self.df = self.dssp.df
-            self.data = self.dssp.df
-        if self.parent is not None:
-            self.parent.job = self.job
+        # if 'dist' in job_name:
+        #     self.dist = Distance.from_json(os.path.join(self.root, job_name), parent=self)
+        #     self.df = self.dist.df
+        #     self.data = self.dist.df
+        # if 'dssp' in job_name:
+        #     self.dssp = DSSP.from_json(os.path.join(self.root, job_name), parent=self)
+        #     self.df = self.dssp.df
+        #     self.data = self.dssp.df
+        # if self.parent is not None:
+        #     self.parent.job = self.job
         return self
+
+    def concatGMX(self, traj_ext='xtc', omit_last=False):
+        '''
+        return the gmx trjcat command to run
+        '''
+        # get trajectory files
+        trajs = []
+        for root, dirs, files in os.walk(self.root):
+            for dir in dirs:
+                path = os.path.join(root, dir)
+                for file in os.listdir(path):
+                    if file.endswith(traj_ext):
+                        trajs.append(os.path.join(dir, file))
+            break
+        # sort trajectory files
+        to_sort = []
+        for traj in trajs:
+            if ('step' in traj) or ('equil' in traj) or ('nvt' in traj) or ('em' in traj) or ('minim' in traj) or ('npt' in traj):
+                continue
+            if 'part' not in traj:
+                to_sort.append((traj, 0))
+                continue
+            pattern = 'part[0-9]*'
+            result = re.search(pattern, traj)
+            if result is None:
+                continue
+            string = result.group(0)
+            index = int(''.join([char for char in string if char.isnumeric()]).lstrip('0'))
+            to_sort.append((traj, index))
+        _sorted = sorted(to_sort, key=lambda x: x[1])
+        # construct command
+        start = _sorted[0][0].split(os.sep)[0].split('_')[0] # this line might cause error in the future - assumes that the folder name formatted like 0_25ns or something 
+        if omit_last:
+            stop = _sorted[-2][0].split(os.sep)[0].split('_')[-1][:-2]
+        else:
+            stop = _sorted[-1][0].split(os.sep)[0].split('_')[-1][:-2]
+        cmd = 'gmx trjcat -f '
+        for traj, index in _sorted:
+            if omit_last:
+                if index == len(_sorted):
+                    break
+            cmd = cmd + '{} '.format(traj)
+        cmd = cmd + '-o cat.{}.{}.{}'.format(start, stop, traj_ext)
+        print(cmd)
+        return cmd
+            
+
 
     def load_trajectory(self, stride=1, selection='all', b=0, e=-1):
         if stride != 0:
