@@ -19,9 +19,9 @@ class Ndx:
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
         types = self.getTypes(self.ndxt_groups, ligands)
-        # self.types = {}
-        # for key in types.keys():
-        #     self.types[key] = Type(key, types[key])
+        self.types = {}
+        for key in types.keys():
+            self.types[key] = Type(key, types[key])
         # self.selections = {}
 
     @property
@@ -655,14 +655,17 @@ Selection Examples:
 
     
     parser.add_argument('gro', type=str, help='[.gro/ .pdb/ .pdbqt] (required)\n  Structure file')
+    parser.add_argument('-r', '--residue', help='Create files with residues as individaul index groups', action='store_true')
+
+    parser.add_argument('-p', '--peptides', help='Create files with peptides/chains as individual index grups')
     parser.add_argument('-selections', nargs='+', type=str, help='  Selection string(s). Each individual selection must be enclosed in quotations. Run with option --show-examples to see demonstrations.')
     parser.add_argument('-ligands', nargs='*', type=str, help="  Residue names for ligand(s) or other non-standard residues in the structure file, if any. If not specified and non-residue ligands are present, will be grouped under 'non protein'")
-    parser.add_argument('-o', '--output', nargs='?', default='index.ndx', help='[.ndx] (default: index.ndx)\n  Output index file')
-    parser.add_argument('--show-examples', action='store_true', help='Show examples and quit')
+    # parser.add_argument('-o', '--output', nargs='?', default='index.ndx', help='[.ndx] (default: index.ndx)\n  Output index file')
+    # parser.add_argument('--show-examples', action='store_true', help='Show examples and quit')
 
-    if '--show-examples' in sys.argv:
-        print(epilog)
-        sys.exit(0)
+    # if '--show-examples' in sys.argv:
+    #     print(epilog)
+    #     sys.exit(0)
     # show help if ran with no arguments
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -689,8 +692,8 @@ def main():
     # make ndx
     n = Ndx(args.gro, ligands=args.ligands)
     for selection in args.selections:
-        n.select(selection.lower())
-    n.makeNDX(args.output)
+        selection = n.select(selection.lower())
+    # n.makeNDX(args.output)
 
 if __name__ == '__main__':
     main()

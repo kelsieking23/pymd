@@ -1,4 +1,5 @@
 from pymd.utilities.rewritepdb import writePDB, editChainIDResidue
+import MDAnalysis as mda
 
 def convertCoordinates(coordinates):
     xyz = list(map(float, coordinates))
@@ -10,7 +11,15 @@ def convertCoordinates(coordinates):
         transformed.append(c)
     return transformed
     
-def convertGro(structure, ligands=None):
+def convertGro(structure):
+    universe = mda.Universe(structure)
+    newfilename = structure[:-3] + 'pdb'
+    with mda.Writer(newfilename) as pdb:
+        pdb.write(universe)
+    return newfilename
+def convertGroOld(structure, ligands=None):
+    valid_residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD',
+                'ACE', 'NH2', 'NME']
     f = open(structure, 'r')
     contents = f.readlines()
     f.close()
@@ -30,14 +39,29 @@ def convertGro(structure, ligands=None):
             break
         else:
             line_parts = line.split()
-            if (line_parts[0].endswith('NA')) or (line_parts[0].endswith('CL')):
-                res_name = line_parts[0][-2:]
-            else:
-                res_name = line_parts[0][-3:]
-            if residue is None:
-                residue = int(line_parts[0][:-3])
-            res_num = str(residue)
+            gro_res_id = line[0:8]
+            res_name = ''.join(char for char in gro_res_id if char.isalpha())
+            res_num = ''
+            chars = 0
+            for char in gro_res_id:
+                if (char.isnumeric()) or (char == ' '):
+                    res_num = res_num + char
+                else:
+                    break
+            res_num = res_num.strip()
+            res_name = gro_res_id[chars:]
             res_id = res_name + res_num
+            if residue is None:
+                print(res_num)
+                residue = int(res_num)
+            # if (line_parts[0].endswith('NA')) or (line_parts[0].endswith('CL')):
+            #     res_name = line_parts[0][-2:]
+            # else:
+            #     res_name = line_parts[0][-3:]
+            # if residue is None:
+            #     residue = int(line_parts[0][:-3])
+            # res_num = str(residue)
+            # res_id = res_name + res_num
             if ligands is not None:
                 if res_name in ligands:
                     if k == 0:
@@ -46,26 +70,35 @@ def convertGro(structure, ligands=None):
                     else:
                         pass
                 else: residues.append(res_name)
-            elif (res_name == 'SOL') or (res_name == 'NA') or (res_name == 'CL'):
+            elif (res_name == 'SOL') or (res_name == 'NA') or (res_name == 'CL') or (res_name == 'TIP3'):
                 pass
             else:
                 residues.append(res_name)
             atom_num = str(atom)
-            if len(line_parts) >= 6:
-                atom_type = line_parts[1]
-                x, y, z = convertCoordinates(line_parts[3:6])
-            if len(line_parts) == 5:
-                x, y, z = convertCoordinates(line_parts[2:])
-                if not (line_parts[1].startswith('HW')):
-                    atom_type = line_parts[1][:2]
-                else:
-                    atom_type = line_parts[1][:3]
-            if res_name == 'SOL':
-                newline = ['ATOM', atom_num, atom_type, res_name, res_num, x, y, z, '1.00', '0.00']
-            elif (res_name == 'NA') or (res_name == 'CL'):
+            atom_type = line[8:15].strip()
+            x = line[20:28].strip()
+            y = line[28:36].strip()
+            z = line[36:45].strip()
+            x,y,z = convertCoordinates([x,y,z])
+            # if len(line_parts) >= 6:
+            #     atom_type = line_parts[1]
+            #     x, y, z = convertCoordinates(line_parts[3:6])
+            # if len(line_parts) == 5:
+            #     x, y, z = convertCoordinates(line_parts[2:])
+            #     if not (line_parts[1].startswith('HW')):
+            #         atom_type = line_parts[1][:2]
+            #     else:
+            #         atom_type = line_parts[1][:3]
+            if res_name not in valid_residues:
                 newline = ['ATOM', atom_num, atom_type, res_name, res_num, x, y, z, '1.00', '0.00']
             else:
                 newline = ['ATOM', atom_num, atom_type, res_name, 'X', res_num, x, y, z, '1.00', '0.00']
+            # if res_name == 'SOL':
+            #     newline = ['ATOM', atom_num, atom_type, res_name, res_num, x, y, z, '1.00', '0.00']
+            # elif (res_name == 'NA') or (res_name == 'CL'):
+            #     newline = ['ATOM', atom_num, atom_type, res_name, res_num, x, y, z, '1.00', '0.00']
+            # else:
+            #     newline = ['ATOM', atom_num, atom_type, res_name, 'X', res_num, x, y, z, '1.00', '0.00']
             data.append(newline)
             atom += 1
             if atom == 100000:
@@ -84,7 +117,7 @@ def convertGro(structure, ligands=None):
                     else:
                         next_res_name = next_line_parts[0][-3:]
                     if next_res_name == residues[0]:
-                        print(next_res_name)
+                        # print(next_res_name)
                         residue = int(next_res_num)
                     else:
                         residue += 1 

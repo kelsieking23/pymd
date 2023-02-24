@@ -56,6 +56,8 @@ class Plotter:
                 ax.plot(d.x, d.y, color=d.color, label=d.label, linestyle=linestyle, alpha=d.alpha)
             if hasattr(d, 'fill_between'):
                 ax.fill_between(d.x, d.y-d.fill_between, d.y+d.fill_between, alpha=0.2, color=d.color)
+            if d.scatter:
+                ax.scatter(d.x, d.y, color=d.color, marker=d.marker, s=d.s)
             p += 1
 
         # labels and axes
@@ -64,6 +66,9 @@ class Plotter:
 
         if (hasattr(pdata.xticks, 'locs')) and (pdata.xticks.locs is not None):
             ax.xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
+        if (hasattr(pdata.xticks, 'labels')) and (pdata.xticks.labels is not None):
+            print(pdata.xticks.labels)
+            ax.set_xticklabels(pdata.xticks.labels, rotation=pdata.xticks.xtick_label_rotation)
         # plt.xticks(fontsize=pdata.xticks.fontsize)
         if (hasattr(pdata.yticks, 'locs')) and (pdata.yticks.locs is not None):
             ax.yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
@@ -89,7 +94,7 @@ class Plotter:
 
         # title
         if pdata.title is not None:
-            ax.set_title(pdata.title.title, fontsize=pdata.title.fontsize)
+            ax.set_title(pdata.title.title, fontsize=pdata.title.fontsize, weight=pdata.title.weight)
 
         # legend
         if (pdata.legend is not None) and (pdata.legend is not False):
@@ -102,8 +107,8 @@ class Plotter:
             else:
                 ax.legend(loc=pdata.legend.loc)
 
-        ax.set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize)
-        ax.set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize)
+        ax.set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize, weight=pdata.xlabel.weight)
+        ax.set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize, weight=pdata.xlabel.weight)
 
         # annotations
         if pdata.annotations is not None:
@@ -173,7 +178,7 @@ class Plotter:
         return _min_x, _max_x, _min_y, _max_y
 
     def timeseriesPanel(self, data, ncols, nrows, title=None, axes=[], sharex=True, sharey=True, 
-                        output=None, legend=True, legend_data=None, show=True, w = 8, scale = 1):
+                        output=None, legend=True, legend_data=None, show=True, w = 8, scale = 1.0):
         fig, ax = plt.subplots(nrows, ncols, sharex=sharex, sharey=sharey)
         # fig = plt.figure() 
         normal_w = w
@@ -192,19 +197,27 @@ class Plotter:
         _ylabel = None
         rows = []
         i = 0
-        row_counter = -1
-        if nrows > 1:
-            indeces = nrows
-        else:
-            indeces = ncols
-        for x in range(0, indeces):
+        row = 0
+        col = 0
+        # if nrows > 1:
+        #     indeces = nrows
+        # else:
+        #     indeces = ncols
+        for x in range(0, len(data)):
             pdata = data[i]
-            if sharex:
-                _xlabel = pdata.xlabel.label
+            if x % ncols == 0:
+                row += 1
+            else:
+                if sharey:
+                    pdata.ylabel.label = None
+            if (row != nrows) and (sharex):
                 pdata.xlabel.label = None
-            if sharey:
-                _ylabel = pdata.ylabel.label
-                pdata.ylabel.label = None
+            # if sharex:
+            #     _xlabel = pdata.xlabel.label
+            #     pdata.xlabel.label = None
+            # if sharey:
+            #     _ylabel = pdata.ylabel.label
+            #     pdata.ylabel.label = None
             if axes == []:
                 ax.flat[x] = self.timeseries(pdata, fig=fig, ax=ax.flat[x], show=False)
                 _min_x, _max_x, _min_y, _max_y = self.minmax(ax.flat[x].get_xlim(), ax.flat[x].get_ylim(), _min_x, _max_x, _min_y, _max_y)
@@ -286,12 +299,12 @@ class Plotter:
         #     ax_.set_xlim(_min_x, _max_x)
         #     ax_.set_ylim(_min_y, _max_y)
         
-        if sharex:
-            ax.flat[-1].set_xlabel(_xlabel, fontsize=pdata.xlabel.fontsize)
-        if sharey:
-            for row in rows:
-                print(_ylabel)
-                row[0].set_ylabel(_ylabel, fontsize=pdata.ylabel.fontsize)
+        # if sharex:
+        #     ax.flat[-1].set_xlabel(_xlabel, fontsize=pdata.xlabel.fontsize)
+        # if sharey:
+        #     for row in rows:
+        #         print(_ylabel)
+        #         row[0].set_ylabel(_ylabel, fontsize=pdata.ylabel.fontsize)
 
         # if (len(data) % 2) != 0:
         #     ax[h-1,w-1].remove()

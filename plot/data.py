@@ -53,7 +53,8 @@ class PlotData:
     @classmethod
     def timeseries(cls, df, title=None, labels='columns', x_label=None, y_label=None, major_xticks=None, minor_xticks=None, colors=None, output=None, ymin=0.0, ymax=None, 
     legend=False, ncol=1, linewidth=2, average=False, std=False, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
-    legend_fontsize=12, semiopen=True, superlegend=False, alpha=1, grid=False):
+    legend_fontsize=12, semiopen=True, superlegend=False, alpha=1, grid=False, weight='regular', xtick_labels=None, xtick_label_rotation='horizontal', title_weight='bold',
+    scatter=False, marker='o', s=60, xpad=0, legend_loc='best'):
         '''
         Arguments:
         df (pandas DataFrame): dataframe containing all the data you want plotted. output of postprocess.getDataFrame
@@ -110,22 +111,22 @@ class PlotData:
 
             # make Data instances and append to data list
             if std is False:
-                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha)
+                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s)
             else:
                 if 'std' in df.columns:
                     if column == 'std':
                         break
-                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha)
+                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s)
                 else:
                     try:
                         assert average is True
                         std_df = pd.DataFrame()
                         std_df['std'] = _df.std(axis=1)
-                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha)
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s)
                     except:
                         if i == 0:
                             print('WARNING: average must be True for standard deviation to plot. Plotting dataframe containing the following files individually: \n {}'.format(df.name))
-                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha)
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s)
             data.append(d)
 
             i += 1
@@ -137,7 +138,13 @@ class PlotData:
                 if df[column].max() > _ymax:
                     _ymax = df[column].max()
         # tick labels and locations
-        xticks = ElementParam(xmin=df.index[0], xmax=round(df.index[-1]), locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks)
+        if xtick_labels is not None:
+            _xtick_labels = [0]
+            for l in xtick_labels:
+                _xtick_labels.append(l)
+            xtick_labels = _xtick_labels
+        xticks = ElementParam(xmin=df.index[0]-xpad, xmax=round(df.index[-1])+xpad, locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, labels=xtick_labels,
+                            xtick_label_rotation=xtick_label_rotation)
         # xticks = ElementParam(xmin=df.index[0], xmax=round(1000), locs=major_xticks, fontsize=14, minor_locs=minor_xticks)
 
         if ymax is None:
@@ -155,17 +162,17 @@ class PlotData:
             }
         # axis labels and locations
         if x_label is not None:
-            xlabel = ElementParam(label=x_label, fontsize=ax_label_fontsize)
+            xlabel = ElementParam(label=x_label, fontsize=ax_label_fontsize, weight=weight)
         else:
-            xlabel = ElementParam(label=df.attrs['x_label'], fontsize=ax_label_fontsize)
+            xlabel = ElementParam(label=df.attrs['x_label'], fontsize=ax_label_fontsize, weight=weight)
         if y_label is not None:
-            ylabel = ElementParam(label=y_label, fontsize=ax_label_fontsize)
+            ylabel = ElementParam(label=y_label, fontsize=ax_label_fontsize, weight=weight)
         else:
-            ylabel = ElementParam(label=df.attrs['y_label'], fontsize=ax_label_fontsize)
+            ylabel = ElementParam(label=df.attrs['y_label'], fontsize=ax_label_fontsize, weight=weight)
 
         # title
         if title is not None:
-            title = ElementParam(title=title, fontsize=title_fontsize)
+            title = ElementParam(title=title, fontsize=title_fontsize, weight=title_weight)
         else:
             title = None
 
@@ -177,7 +184,7 @@ class PlotData:
 
         #legend 
         if legend is not False:
-            legend = ElementParam(loc='best', ncol=ncol, fontsize=legend_fontsize)
+            legend = ElementParam(loc=legend_loc, ncol=ncol, fontsize=legend_fontsize)
         
         # panel legend data
         if superlegend is True:

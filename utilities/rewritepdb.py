@@ -332,27 +332,27 @@ def reassignChainID(filename, chain_id, output=None, renumber_chains=False):
     f.close()
             
 def formatString(line_parts, chain_id=None):
-    atom_name = line_parts[2]
-    if chain_id is not None:
-        line_parts[4] = chain_id
-    coords = None
-    if line_parts[4].isalpha():
-        try:
-            coords = list(map(float, line_parts[6:9]))
-        except:
-            coords = fixBadCoordinates(line_parts[6:9])
-            line_parts = line_parts[:6] + list(map(str, coords)) + line_parts[8:]
-    else:
-        try:
-            coords = list(map(float, line_parts[5:8]))
-        except:
-            coords = fixBadCoordinates(line_parts[5:8])
-            line_parts = line_parts[:5] + list(map(str, coords)) + line_parts[7:]
-    if len(atom_name) > 3:
-        string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8s}{:>8s}{:>8s}  {:>3s}  {:>3s}{:>12s}\n'.format(*line_parts)
-    else:
-        string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8s}{:>8s}{:>8s}  {:>3s}  {:>3s}{:>12s}\n'.format(*line_parts)
-    return string
+        atom_name = line_parts[2]
+        if chain_id is not None:
+            line_parts[4] = chain_id
+        coords = None
+        if line_parts[4].isalpha():
+            try:
+                coords = list(map(float, line_parts[6:9]))
+            except:
+                coords = fixBadCoordinates(line_parts[6:9])
+                line_parts = line_parts[:6] + list(map(str, coords)) + line_parts[8:]
+        else:
+            try:
+                coords = list(map(float, line_parts[5:8]))
+            except:
+                coords = fixBadCoordinates(line_parts[5:8])
+                line_parts = line_parts[:5] + list(map(str, coords)) + line_parts[7:]
+        if len(atom_name) > 3:
+            string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8s}{:>8s}{:>8s}  {:>3s}  {:>3s}{:>12s}\n'.format(*line_parts)
+        else:
+            string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8s}{:>8s}{:>8s}  {:>3s}  {:>3s}{:>12s}\n'.format(*line_parts)
+        return string
 
 def fixBadCoordinates(line_parts):
     '''

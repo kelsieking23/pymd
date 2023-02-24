@@ -32,7 +32,7 @@ class Distance(Analysis):
         self.res = None
         self._exclude_chain = True
         self.exclude_neighbors = 2
-        self._output = None
+        self._output = 'dist.csv'
         self.job_name = 'dist'
         self.nprocs = 'auto'
         self.compress = False
@@ -134,6 +134,15 @@ class Distance(Analysis):
                 true_pairs.append([x, y])
         return np.array(true_pairs)
 
+    def ligand_residue_pairs(self, lig_name):
+        valid_res = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
+        residue_indeces = [res.index for res in self.top.residues if res.name in valid_res]
+        ligand_index = [res.index for res in self.top.residues if res.name == '{}'.format(lig_name)][0]
+        p = []
+        for ri in residue_indeces:
+            p.append([ri, ligand_index])
+        return np.array(p)
+
     def run(self, method='residue', output='dist.csv',residues=[], cutoff=0.35, **kwargs):
         self._output = output
         self.method = method
@@ -146,9 +155,9 @@ class Distance(Analysis):
             if residues == []:
                 pairs = self.residue_pairs([i for i in range(self.traj.n_residues)])
             else:
-                for res in self.top.residues:
-                    if res.resSeq in residues:
-                        print(res.name, res.resSeq, res.index)
+                # for res in self.top.residues:
+                    # if (res.resSeq in residues):
+                    #     print(res.name, res.resSeq, res.index)
                 pairs = self.residue_pairs([res.index for res in self.top.residues if res.resSeq in residues])
             if self._exclude_chain:
                 pairs = self.exclude_chains(pairs, method='residue')
@@ -200,6 +209,23 @@ class Distance(Analysis):
         return self.df
     
     def by_residue(self, contact_pairs, squareform=False, **kwargs):
+        if self.parent is not None:
+            print('Computing residue contacts for {}...'.format(self.parent.id))
+        distances, pairs = mdtraj.compute_contacts(self.traj, contacts=contact_pairs, **kwargs) # type: ignore
+        # sq = mdtraj.geometry.squareform(distances, pairs)
+        distances = pd.DataFrame(distances)
+        pairs = pd.DataFrame(pairs)
+        distances.columns = ['{}_{}'.format(pairs.loc[index,0], pairs.loc[index, 1]) for index in pairs.index]  # type: ignore
+        self.df = distances
+        # if squareform:
+        #     self.df = sq
+        if self.output is not None:
+            print('Writing {}'.format(self.output))
+            print('Shape: {}'.format(self.df.shape))
+            self.df.to_csv(self.output)
+        return self.df
+
+    def ligand_residue(self, contact_pairs, squareform=False, **kwargs):
         if self.parent is not None:
             print('Computing residue contacts for {}...'.format(self.parent.id))
         distances, pairs = mdtraj.compute_contacts(self.traj, contacts=contact_pairs, **kwargs) # type: ignore

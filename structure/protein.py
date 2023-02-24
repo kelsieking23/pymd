@@ -268,6 +268,7 @@ class Protein:
         Get residue ID's for each residue in the PDB. Ignores residues passed in ignore argument, if any. 
         ** Returns: list
         '''
+        valid_residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
         residue_ids = []
         ligands = []
         residue_index = 1
@@ -280,6 +281,8 @@ class Protein:
                     if ('SOL' in line) or ('SWM4' in line):
                         break
                     residue_name = line_parts[3]
+                    if residue_name not in valid_residues:
+                        continue
                     residue_number = line_parts[5]
                     residue_id = residue_name + residue_number
                     chain_id = line_parts[4]

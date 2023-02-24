@@ -333,7 +333,7 @@ class System:
                         if (heavy is True) and (atom.type == 'H'):
                             continue
                         d = np.sqrt((atom.coordinates[0] - residue_coordinate[0])**2 + (atom.coordinates[1] - residue_coordinate[1])**2 + (atom.coordinates[2] - residue_coordinate[2])**2)
-                        if d <= 5:
+                        if d <= distance:
                             interactions[res_id][ligand.name] +=1
                 atom_count = ligand.atomCount(heavy=heavy)
                 interactions[res_id][ligand.name] = interactions[res_id][ligand.name] / atom_count

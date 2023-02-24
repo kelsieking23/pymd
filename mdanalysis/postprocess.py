@@ -84,7 +84,8 @@ class PostProcess:
                     elif line.startswith('@'):
                         # check if time is in ps, if yes, convert
                         if (len(line.split()) > 3) and (line.split()[3] == '"Time'):
-                            if ('ps' in line.split()[4]):
+                            if (line.split()[4].strip('"').strip('(').strip(')') != self.tu):
+                                print(line.split()[4])
                                 convert = True
                         skiprows += 1
                     else:

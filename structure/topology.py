@@ -7,7 +7,7 @@ import mdtraj
 import pandas as pd
 from pymd.utilities.gro import convertGro
 
-class Peptide:
+class Topology:
     '''
     class name for now might be misnomer, but designing this to be a replacement for Protein class
     for use with a trajectory. 
@@ -36,7 +36,8 @@ class Peptide:
             sele = self.selection
         else:
             raise ValueError('selection must be string or iterable')
-        return self._chain_topology_from_subset(top, sele)
+        # return self._chain_topology_from_subset(top, sele)
+        return top
     
     def _chain_topology_from_subset(self, top, sele):
         '''
