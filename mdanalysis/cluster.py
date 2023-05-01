@@ -28,7 +28,7 @@ import random
 
 class Cluster:
 
-    def __init__(self, xtc, top, selection='backbone', stride=0, b=0, e=-1, cutoff=0.2, n_clusters=None, verbose=False):
+    def __init__(self, xtc, top, root=None, job_name='cluster', system_name='system', selection='backbone', stride=0, b=0, e=-1, cutoff=0.2, n_clusters=None, verbose=False, job_params = {}):
         self.xtc = xtc
         self.top = top
         self.selection = selection
@@ -40,22 +40,23 @@ class Cluster:
         self._X = None
         self.X = None
         self.y = None
+        self.job_name = job_name
         self.stride = stride
         self.b = b
         self.e = e
         self.analyze = None
         self._parent = None
-        self._root = None
+        self._root = root
         self.argmins = None
         self.centroids = None
-        self._job_params = None
+        self._job_params = job_params
         self._log = None
         self.verbose = verbose
         self.method = None
         self.fig = None
         self.ax = None
         self._root = None
-
+        self.system_name = system_name
 
     @staticmethod
     def now():
@@ -78,7 +79,16 @@ class Cluster:
 
     @property
     def root(self):
-        return self._root
+        if self.parent is not None:
+            root = os.path.join(self.parent.root, self.job_name)
+        else:
+            if os.path.dirname(self.xtc) == '':
+                root =  os.path.join(os.getcwd(), self.job_name)
+            else:
+                root = os.path.join(os.path.dirname(self.xtc), self.job_name)
+        if not os.path.isdir(root):
+            os.mkdir(root)
+        return root
     
     @root.setter
     def root(self, root):
@@ -125,7 +135,9 @@ class Cluster:
         if nprocs == 'auto':
             nprocs = mp.cpu_count() / 2
         nframes, _, _ = self.traj._xyz.shape
+        print(self.traj.xyz.shape)
         interval = int(nframes // nprocs)
+        print(nframes, nprocs)
         partitions = []
         procid=1
         for i in range(0, nframes, interval):
@@ -158,6 +170,7 @@ class Cluster:
         log.write('Selection: {}\n'.format(self.job_params['selection']))
         log.write('Start Index: {}\n'.format(self.job_params['b']))
         log.write('Stop Index: {}\n'.format(self.job_params['e']))
+        log.write('Stride: {}\n'.format(self.job_params['stride']))
         if self.job_params['n_clusters'] is None:
             log.write('N Clusters: None (will determine via distortions)\n')
         else:
@@ -177,9 +190,9 @@ class Cluster:
             print('Loading trajectory...')
         self.loadTrajectory()
         if matrix is None:
-            log.write('Beginning RMSD matrix calculation for {}...\n'.format(self.parent.id))
+            log.write('Beginning RMSD matrix calculation for {}...\n'.format(self.system_name))
             if self.verbose:
-                print('Beginning RMSD matrix calculation for {}...'.format(self.parent.id))
+                print('Beginning RMSD matrix calculation for {}...'.format(self.system_name))
             log.write('Performing {} processes\n'.format(nprocs))
             partitions = self.getPartitions(nprocs)
             # for partition in partitions:
@@ -195,7 +208,7 @@ class Cluster:
                 sys.exit(1)
             log.write('{} processes complete\n'.format(nprocs))
             if self.verbose:
-                print('{} processes complete for {}'.format(nprocs, self.parent.id))
+                print('{} processes complete for {}'.format(nprocs, self.system_name))
             log.write('Concatenating data...\n')
             df = pd.concat(results, axis=1)
             df = df.fillna(df.T)
@@ -263,7 +276,7 @@ class Cluster:
             log = open(self.log, 'a')
         log.write('Performing PCA...\n')
         if self.verbose:
-            print('Performing PCA for {}'.format(self.parent.id))
+            print('Performing PCA for {}'.format(self.system_name))
         p = PCA(n_components=n_components)
         if scale is True:
             scaler = StandardScaler()
@@ -274,7 +287,7 @@ class Cluster:
         self.df.to_csv(os.path.join(self.root, 'pca.csv'))
         log.write('PCA complete\nWrote {}\n\n'.format(os.path.join(self.root, 'pca.csv')))
         if self.verbose:
-            print('PCA complete for {}'.format(self.parent.id))
+            print('PCA complete for {}'.format(self.system_name))
         log.close()
         return self.df
 
@@ -285,7 +298,7 @@ class Cluster:
             log = open(self.log, 'a')
         log.write('Performing K-Means Clustering...\n')
         if self.verbose:
-            print('Performing K-means for {}'.format(self.parent.id))
+            print('Performing K-means for {}'.format(self.system_name))
         if self.n_clusters is not None:
             n_clusters = self.n_clusters
         elif n_clusters is not None:
@@ -308,14 +321,14 @@ class Cluster:
         self.y = km.fit_predict(self.X)
         self.centroids = km.cluster_centers_
         if output is not None:
-            self.plotClusters(title='{}\nK = {}'.format(self.parent.name, n_clusters), output=output)
+            self.plotClusters(title='{}\nK = {}'.format(self.system_name, n_clusters), output=output)
         else:
             output = os.path.join(self.root, 'kmeans.png')
-            self.plotClusters(title='{}\nK = {}'.format(self.parent.name, n_clusters), output=output)
+            self.plotClusters(title='{}\nK = {}'.format(self.system_name, n_clusters), output=output)
         self.argmins, _ = pairwise_distances_argmin_min(km.cluster_centers_, self.X)
         log.write('K-means clustering complete.\n\n')
         if self.verbose:
-            print('K-means clustering for {} complete'.format(self.parent.id))
+            print('K-means clustering for {} complete'.format(self.system_name))
         log.close()
         self.method = 'kmeans'
 
@@ -527,8 +540,8 @@ class Cluster:
                 plt.savefig(output)
         self.fig = fig
         self.ax = ax
-        self.parent.fig = fig
-        self.parent.ax = ax
+        # self.parent.fig = fig
+        # self.parent.ax = ax
         plt.close()
 
     def getCentralStructureIndices(self, df):
@@ -655,7 +668,7 @@ class Cluster:
             prefix_log.write('Clustering job complete. End time {}\n'.format(self.now())) 
             size_df.to_csv(os.path.join(self.root, '{}.size.csv'.format(prefix)))
         if self.verbose:
-            print('Clustering job for {} complete\n\n'.format(self.parent.id))
+            print('Clustering job for {} complete\n\n'.format(self.system_name))
         if prefix is not None:
             prefix_log.close()
         log.close()
@@ -719,9 +732,9 @@ class Cluster:
 
 
 # run clustering example
-def runClustering():
-    clust = Cluster('cat.pbc.nowat.xtc', 'nowat.top.gro', stride=10)
-    clust.run(nprocs=6, output='cluster.csv')
+# def runClustering():
+#     clust = Cluster('cat.pbc.nowat.xtc', 'nowat.top.gro', stride=10)
+#     clust.run(nprocs=6, output='cluster.csv')
 
 # if __name__ == '__main__':
 #     # run clustering

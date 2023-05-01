@@ -131,6 +131,9 @@ class Run:
             n_clusters = [n_clusters] * len(self.system._reps)
         counter = 0
         for rep in self.system._reps:
+            print(rep, rep.root)
+            if not rep.root.split(os.sep)[-1].startswith('rep'):
+                continue
             print(n_clusters, n_clusters[counter])
             i = os.path.join(rep.root, inp)
             t = os.path.join(rep.root, top)

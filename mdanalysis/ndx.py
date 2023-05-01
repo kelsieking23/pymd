@@ -22,7 +22,7 @@ class Ndx:
         self.types = {}
         for key in types.keys():
             self.types[key] = Type(key, types[key])
-        # self.selections = {}
+        self.selections = {}
 
     @property
     def residues(self):
@@ -266,7 +266,7 @@ class Ndx:
         mainchain = ['ca', 'c', 'o', 'n', 'hn', 'h', 'ha']
         ions = ['k', 'cl', 'na', 'sod', 'cla']
         solvent = ['sol', 'tip3p']
-        headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11']
+        headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11', 'p']
         types = {
             'system':[],
             'protein':[],
@@ -479,12 +479,15 @@ class Ndx:
                         types[res_name] = [atom_num]
                     else:
                         types[res_name].append(atom_num)
+                    types['nonprotein'].append(atom_num)
                 # ions
                 elif res_name in ions:
                     types['ions'].append(atom_num)
+                    types['nonprotein'].append(atom_num)
                 # solvent
                 elif res_name in solvent:
                     types['solvent'].append(atom_num)
+                    types['nonprotein'].append(atom_num)
                     # break
                 # ligands
                 elif res_name in ligands:
@@ -494,6 +497,7 @@ class Ndx:
                         types[res_id].append(atom_num)
                     else:
                         types[res_id].append(atom_num)
+                    types['nonprotein'].append(atom_num)
                 # other non protein
                 else:
                     types['nonprotein'].append(atom_num)

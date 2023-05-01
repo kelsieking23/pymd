@@ -116,13 +116,16 @@ class System:
         #         os.mkdir(os.path.join(directory['images']['root'], atype))
         #     directory['images'][atype] = os.path.join(directory['images']['root'], atype)
         self._reps = []
-        folder_names = sorted([folder for folder in os.listdir(self.root) if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder)))])
+        # folder_names = sorted([folder for folder in os.listdir(self.root) if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder)))])
+        folder_names = sorted([folder for folder in os.listdir(self.root) if (folder.startswith('rep'))])
+
         custom_names = False
-        for folder in os.listdir(self.root):
-            if (not folder.startswith('rep')) and (not folder.isnumeric()):
-                if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder))):
-                    custom_names = True
-                    break
+        # for folder in os.listdir(self.root):
+        #     if (not folder.startswith('rep')) and (not folder.isnumeric()):
+        #         if (folder != 'scripts') and (not os.path.isfile(os.path.join(self.root, folder))):
+        #             custom_names = True
+        #             break
+        custom_names = False
         for rep in range(1, self.reps+1):
             repnum = rep
             rep = 'rep{}'.format(rep)

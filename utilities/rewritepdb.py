@@ -407,8 +407,10 @@ def editChainIDResidue(filename, newfilename, nterm, cterm, sm=None):
     chain_id = 'A'
     i = 0
     sol = False
-
+    residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
     for line in contents:
+        if line.startswith('ENDMDL'):
+            chain_id = 'A'
         if line.startswith('ATOM'):
             line_parts = line.split()
             # check if chain ID exists
@@ -416,19 +418,31 @@ def editChainIDResidue(filename, newfilename, nterm, cterm, sm=None):
                 first_four_fields = line_parts[:4]
                 first_four_fields.append(chain_id)
                 line_parts = first_four_fields + line_parts[4:]
+            else:
+                first_four_fields = line_parts[:4]
+                first_four_fields.append(chain_id)
+                line_parts = first_four_fields + line_parts[5:]
+            if line_parts[3] not in residues:
+                newcontents.append(line)
+                continue
             # check if last field is segid
             if isFloat(line_parts[-1]):
-                segid = line_parts[2][0]
+                segid = [char for char in line_parts[2] if char.isalpha()][0]
                 line_parts.append(segid)
             # increment chain ID 
             if (line != contents[-1]) and (contents[i + 1].startswith('ATOM')):
                 res_name = line_parts[3]
+                res_num  = line_parts[5]
+                res_id = res_name + res_num
                 next_res_name = contents[i+1].split()[3]
+                next_res_num = contents[i+1].split()[4]
+                next_res_id = next_res_name + next_res_num
                 # increment bc going to new nterm
-                if (res_name == cterm) and (next_res_name == nterm):
+                if (res_id == cterm) and (next_res_id == nterm):
+                    print(res_id, next_res_id)
                     chain_id = chr(ord(chain_id) + 1)
                 # increment bc going to new sm from cterm
-                if (res_name == cterm) and (next_res_name == sm):
+                if (res_id == cterm) and (next_res_name == sm):
                     chain_id = chr(ord(chain_id) + 1)
                 # increment bc going to new sm from another sm
                 if (res_name == sm):

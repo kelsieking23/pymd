@@ -6,7 +6,6 @@ import sys
 from cycler import cycler
 
 from pandas.core.algorithms import isin
-from pymd.plot.plotter import Plotter
 import math
 
 
@@ -46,6 +45,67 @@ class PlotData:
             raise ValueError('No plot type specified')
         if self.plot_type == 'timeseries':
             plotter.timeseries(self)
+
+    @staticmethod
+    def label(df, column, i, labels='columns'):
+        if labels is None:
+            return '__nolegend__'
+        elif labels == 'columns':
+            return column
+        else:
+            return labels[i]
+
+    @staticmethod
+    def color(colors, column, i):
+        if isinstance(colors, dict):
+            return colors[column]
+        elif (isinstance(colors, list)) or (isinstance(colors, np.ndarray)):
+            return colors[i]
+        else:
+            return colors
+    
+    @staticmethod
+    def max(df, column, _max=None):
+        if _max is None:
+            _max = df[column].max()
+        else:
+            if df[column].max() > _max:
+                _max = df[column].max()
+        return _max
+    
+    @staticmethod
+    def min(df, column, _min=None):
+        if _min is None:
+            _min = df[column].min()
+        else:
+            if df[column].max() > _min:
+                _min = df[column].min()
+        return _min
+
+
+    @staticmethod
+    def ymax_hist(x, bins, density, _ymax=None):
+        counts, _ = np.histogram(x, bins=bins, density=density)
+        if _ymax is None:
+            return counts.max()
+        if counts.max() > _ymax:
+            return counts.max()
+        return _ymax
+
+    @staticmethod
+    def xbounds_hist(x, bins, density, bounds=(None, None)):
+        _, bins = np.histogram(x, bins=bins, density=density)
+        if (None in bounds):
+            return bins.min(), bins.max()
+        if bounds[0] > bins.min():
+            _xmin = bins.min()
+        else:
+            _xmin = bounds[0]
+        if bounds[1] < bins.max():
+            _xmax = bins.max()
+        else:
+            _xmax = bounds[1]
+        return _xmin, _xmax
     '''
     Single-System Class Methods
     '''
@@ -54,7 +114,7 @@ class PlotData:
     def timeseries(cls, df, title=None, labels='columns', x_label=None, y_label=None, major_xticks=None, minor_xticks=None, colors=None, output=None, ymin=0.0, ymax=None, 
     legend=False, ncol=1, linewidth=2, average=False, std=False, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
     legend_fontsize=12, semiopen=True, superlegend=False, alpha=1, grid=False, weight='regular', xtick_labels=None, xtick_label_rotation='horizontal', title_weight='bold',
-    scatter=False, marker='o', s=60, xpad=0, legend_loc='best'):
+    scatter=False, marker='o', s=60, xpad=0, legend_loc='best', linestyle='solid'):
         '''
         Arguments:
         df (pandas DataFrame): dataframe containing all the data you want plotted. output of postprocess.getDataFrame
@@ -95,38 +155,52 @@ class PlotData:
             df.attrs = _df.attrs
 
         for column in df.columns:
+            # break for std
+            if (std is True):
+                if ('std' in df.columns):
+                    if column == 'std':
+                        break
+
             # decide labels for legend
             if labels is None:
                 label = '__nolegend__'
             elif labels == 'columns':
                 label = column
             else:
-                label = labels[i]
-
+                if isinstance(labels, (list, tuple, set)):
+                    label = labels[i]
+                elif isinstance(labels, dict):
+                    label = labels[column]
+                else:
+                    print("WARNING: Parameter labels must be: None, 'columns', list, tuple, set, or dict.\n")
+                    print('Parameter labels ({}) is type {}'.format(labels, type(labels)))
+                    print('Label will default to None (nolegend)')
+                    label = '__nolegend__'
             # decide color
             if isinstance(colors, dict):
                 color = colors[column]
-            if (isinstance(colors, list)) or (isinstance(colors, np.ndarray)):
+
+            elif (isinstance(colors, list)) or (isinstance(colors, np.ndarray)):
                 color = colors[i]
+            else:
+                color=colors
 
             # make Data instances and append to data list
             if std is False:
-                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s)
+                d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
             else:
                 if 'std' in df.columns:
-                    if column == 'std':
-                        break
-                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s)
+                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
                 else:
                     try:
                         assert average is True
                         std_df = pd.DataFrame()
                         std_df['std'] = _df.std(axis=1)
-                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s)
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
                     except:
                         if i == 0:
                             print('WARNING: average must be True for standard deviation to plot. Plotting dataframe containing the following files individually: \n {}'.format(df.name))
-                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s)
+                        d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
             data.append(d)
 
             i += 1
@@ -203,6 +277,84 @@ class PlotData:
         saveto = output
 
         return cls('timeseries', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto, legend_data=legend_data)
+
+
+    @classmethod
+    def histogram(cls, df, title='', x_label='',y_label=None,  output=None, ymin=0, ymax=None, xmin=None, xmax=None, xpad=0.5, n_bins='auto', density=True, center=False, annotate=False, labels='columns', alpha=1, colors=None, legend=False, ncol=2, ignore=[], major_xticks=None, minor_xticks=None, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
+    legend_fontsize=12, semiopen=True, superlegend=False, grid=False, weight='regular', xtick_labels=None, xtick_label_rotation='horizontal', title_weight='bold'):
+        if colors is None:
+            # colors = ['#1f464c', '#2a8a2d', '#8a47b0', '#9bcccc']
+            colors = plt.cm.tab20b(np.linspace(0, 1,len(df.columns)))
+
+        if center is True:
+            df = df.subtract(df.mean())
+        data = []
+        i = 0
+        _ymax = None
+        _xmin = None
+        _xmax = None
+        for column in df.columns:
+            if column in ignore:
+                continue
+
+            # decide labels for legend
+            label = cls.label(df, column, i, labels)
+            # decide color
+            colors = cls.color(colors, column, i)
+            
+            #  bins
+            if (n_bins == 'auto') or (isinstance(n_bins, str)):
+                n_bins = math.ceil(1 + (3.322 * math.log(len(df[column]))))
+            # k=100
+            x = df[column]
+
+            d = Data(df=df, x=x, bins=n_bins, density=density, alpha=alpha, color=colors, label=label)
+            data.append(d)
+            i += 1
+            # calculate ymax
+            _ymax = cls.ymax_hist(x, n_bins, density)
+            _xmin, _xmax = cls.xbounds_hist(x, n_bins, density, (_xmin, _xmax))
+        if xmax is None:
+            xmax = _xmax
+        if xmin is None:
+            xmin = _xmin
+        if ymax is None:
+            ymax = _ymax
+        fig = None
+        xticks = ElementParam(xmin=xmin-xpad, xmax=xmax+xpad, fonlocs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, labels=xtick_labels,
+                            xtick_label_rotation=xtick_label_rotation)
+        
+        yticks = ElementParam(ymin=ymin, ymax=ymax, locs=major_yticks, fontsize=tick_label_fontsize, minor_locs=minor_yticks)
+
+        x_label = ElementParam(label=x_label, fontsize=ax_label_fontsize, weight=weight)
+
+        if y_label is not None:
+            y_label = ElementParam(label=y_label, fontsize=ax_label_fontsize, weight=weight)
+        else:
+            if density is True:
+                y_label = ElementParam(label='Probability Density', fontsize=ax_label_fontsize, weight=weight)
+            else:
+                y_label = ElementParam(label='Count', fontsize=ax_label_fontsize, weight=weight)
+                
+
+        title = ElementParam(title=title, fontsize=title_fontsize, weight=title_weight)
+
+        axes = ElementParam(off=False, semiopen=semiopen, grid=grid)
+
+        if (legend is not False) and (legend is not None):
+            legend = ElementParam(loc='upper right', ncol=ncol, fontsize=legend_fontsize)
+
+
+        annotations = None
+        if annotate is True:
+            _max = df['mean'].max()
+            annotations = [ElementParam(atype='plot', x=df.index, y=[_max]*len(df.index), linestyle='--', color='black', linewidth=1),
+                         ElementParam(atype='annotate', text=str(round(_max)), xy=(df.index[-1]-40, _max+10), fontsize=18)]
+        else:
+            annotations = None
+
+        saveto = output
+        return cls('histogram', data, fig, xticks, yticks, x_label, y_label, title, axes, legend, annotations, saveto, lineconnect=None)
 
     @classmethod
     def markerPlot(cls, df, colors=None, title=None, marker='o', x_label='Residue', y_label=None, ymin=-0.2, ymax=None, output=None, major_xticks=None, major_yticks=None, 
@@ -317,7 +469,7 @@ class PlotData:
 
         return cls('marker', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     @classmethod
-    def dsspOverTime(cls, df, title=None, structure='all', annotations=None, output=None, legend=True, colors=None, std=False, linewidth=2, gridline=None):
+    def dsspOverTime(cls, df, title=None, structure='all', annotations=None, output=None, legend=True, colors=None, alpha=1, std=False, linewidth=2, gridline=None):
         if colors is None:
             colors = plt.cm.tab20b(np.linspace(0, 1,len(df.columns)))
             colors = {
@@ -328,41 +480,41 @@ class PlotData:
         
         if structure == 'all':
             if std is True:
-                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
-                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', fill_between=df['bsheet_std'],linewidth=linewidth)
-                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
+                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth, alpha=alpha, scatter=False)
+                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', fill_between=df['bsheet_std'], alpha=alpha,linewidth=linewidth, scatter=False)
+                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth, alpha=alpha, scatter=False)
             else:
-                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil',linewidth=linewidth)
-                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',linewidth=linewidth)
-                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix',linewidth=linewidth)
+                coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil',linewidth=linewidth, alpha=alpha, scatter=False)
+                bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',linewidth=linewidth, alpha=alpha, scatter=False)
+                helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix',linewidth=linewidth, alpha=alpha, scatter=False)
         else:
             if structure == 'coil':
                 if std is True:
-                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth)
+                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], label='Coil', fill_between=df['coil_std'],linewidth=linewidth, alpha=alpha, scatter=False)
                     bsheet = None
                     helix = None
                 else:
-                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], linewidth=linewidth)
+                    coil = Data(df=df, x=df.index, y=df['coil'], color=colors['coil'], linewidth=linewidth, alpha=alpha, scatter=False)
                     bsheet = None
                     helix = None
             if structure == 'bsheet':
                 if std is True:
                     coil = None
-                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',  fill_between=df['bsheet_std'],linewidth=linewidth)
+                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand',  fill_between=df['bsheet_std'],linewidth=linewidth, alpha=alpha, scatter=False)
                     helix = None
                 else:
                     coil = None
-                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', linewidth=linewidth)
+                    bsheet = Data(df=df, x=df.index, y=df['bsheet'], color=colors['bsheet'], label=r'$\beta$-Strand', linewidth=linewidth, alpha=alpha, scatter=False)
                     helix = None
             if structure == 'helix':
                 if std is True:
                     coil = None
                     bsheet = None
-                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth)
+                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', fill_between=df['helix_std'],linewidth=linewidth, alpha=alpha, scatter=False)
                 else:
                     coil = None
                     bsheet = None
-                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', linewidth=linewidth)
+                    helix = Data(df=df, x=df.index, y=df['helix'], color=colors['helix'], label='Helix', linewidth=linewidth, alpha=alpha, scatter=False)
 
         fig = None
 
@@ -373,11 +525,11 @@ class PlotData:
         xticks = ElementParam(xmin=0, xmax=round(df.index[-1]), locs=100, fontsize=16, minor_locs=20)
         yticks = ElementParam(ymin=0, ymax=100, locs=20, fontsize=20, minor_locs=5)
 
-        xlabel = ElementParam(label='Time (ns)', fontsize=22)
-        ylabel = ElementParam(label='Percentage (%)', fontsize=22)
+        xlabel = ElementParam(label='Time (ns)', fontsize=22, weight='bold')
+        ylabel = ElementParam(label='Percentage (%)', fontsize=22, weight='bold')
 
         if title is not None:
-            title = ElementParam(title=title, fontsize=22)
+            title = ElementParam(title=title, fontsize=22, weight='bold')
         else:
             title = None
 
@@ -1105,117 +1257,43 @@ class PlotData:
 
         return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     
-    @classmethod
-    def histogram(cls, df, title, xlabel, output, ymax=10, xmin=-0.5, xmax=0.5, density=True, center=False, annotate=False, labels=None, alpha=None, color=None, legend=False, ignore=[]):
-        import math
-        import numpy as np
-
-        if center is True:
-            df = df.subtract(df.mean())
-        data = []
-        i = 0
-        for col in df.columns:
-            if col in ignore:
-                continue
-            if labels is None:
-                label = '__nolegend__'
-            else:
-                label = labels[i]
-            k = math.ceil(1 + (3.322 * math.log(len(df[col]))))
-            k=100
-            x = df[col]
-            if (alpha is not None) and (color is not None):
-                if isinstance(color, str):
-                    d = Data(df=df, x=x, bins=k, density=density, alpha=alpha, color=color, label=label)
-                elif isinstance(color, list):
-                   d = Data(df=df, x=x, bins=k, density=density, alpha=alpha, color=color[i], label=label) 
-                elif isinstance(color, dict):
-                   d = Data(df=df, x=x, bins=k, density=density, alpha=alpha, color=color[label], label=label)  
-                else:
-                   d = Data(df=df, x=x, bins=k, density=density, alpha=alpha, label=label)   
-            elif (alpha is not None):
-                d = Data(df=df, x=x, bins=k, density=density, alpha=alpha, label=label)
-            elif (color is not None):
-                if isinstance(color, str):
-                    d = Data(df=df, x=x, bins=k, density=density, color=color, label=label)
-                elif isinstance(color, list):
-                   d = Data(df=df, x=x, bins=k, density=density, color=color[i], label=label) 
-                elif isinstance(color, dict):
-                   d = Data(df=df, x=x, bins=k, density=density, color=color[label], label=label)  
-                else:
-                   d = Data(df=df, x=x, bins=k, density=density, label=label)  
-            else:
-                d = Data(df=df, x=x, bins=k, density=density, label=label)
-            data.append(d)
-            i += 1
-
-        fig = None 
-        xticks = ElementParam(xmin=xmin, xmax=xmax, fontsize=14, locs=1)
-        yticks = ElementParam(ymin=0, ymax=ymax, fontsize=14)
-
-        xlabel = ElementParam(label=xlabel, fontsize=16)
-        if density is True:
-            ylabel = ElementParam(label='Probability Density', fontsize=16)
-        else:
-            ylabel = ElementParam(label='Count', fontsize=16)
-
-        title = ElementParam(title=title, fontsize=18)
-
-        axes = ElementParam(off=False, semiopen=False, grid=True)
-
-        if (legend is not False) and (legend is not None):
-            legend = ElementParam(loc='upper right', ncol=2, fontsize=12)
-
-
-        annotations = None
-        if annotate is True:
-            _max = df['mean'].max()
-            annotations = [ElementParam(atype='plot', x=df.index, y=[_max]*len(df.index), linestyle='--', color='black', linewidth=1),
-                         ElementParam(atype='annotate', text=str(round(_max)), xy=(df.index[-1]-40, _max+10), fontsize=18)]
-        else:
-            annotations = None
-
-        saveto = output
-        return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto, lineconnect=None)
 
     @classmethod
-    def heatmap(cls, df, title='', vmin=0, vmax=1, colormap=None, xlabels=None, ylabels=None, legend=True, annotate=False, output=None):
+    def heatmap(cls, df, title='', vmin=0, vmax=1, colormap='viridis', xtick_labels=None, ytick_labels=None, legend=True, annotate=False, output=None, major_xticks=None, minor_xticks=None, major_yticks=None, minor_yticks=None, tick_label_fontsize=12, xtick_label_rotation=0, title_fontsize=20, ax_label_fontsize=18, x_label='', y_label='', weight='regular', title_weight='bold', ytick_label_rotation=0, ytick_offset=0, xtick_offset=0, annotation_fontsize=16, hide_yticks=False, hide_xticks=False):
         if colormap is None:
             colormap='viridis'
         data = Data(df=df, vmin=vmin, vmax=vmax, colormap=colormap)
-        if xlabels is None:
-            xlabels = df.columns
-        if xlabels[0] != 0:
-            xlabs = [0]
-            for item in xlabels:
-                xlabs.append(item)
-            xlabels = xlabs
-        if ylabels is None:
-            ylabels = df.index
+        if xtick_labels is None:
+            xtick_labels = df.columns
+        xlabs = [0]
+        for item in xtick_labels:
+            xlabs.append(item)
+        xtick_labels = xlabs
+        if ytick_labels is None:
+            ytick_labels = df.index
             # ylabels = list(reversed(ylabels))
-        if ylabels[0] != 0:
-            ylabs = [0]
-            for item in ylabels:
-                ylabs.append(item)
-            ylabels = ylabs
+        ylabs = [0]
+        for item in ytick_labels:
+            ylabs.append(item)
+        ytick_labels = ylabs
 
 
+        xticks = ElementParam(xmin=0, xmax=len(df.columns), locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, labels=xtick_labels,
+                            xtick_label_rotation=xtick_label_rotation, offset=xtick_offset, hide=hide_xticks)
 
-        xticks = ElementParam(locs=1, xlabels=xlabels, offset=0.12, fontsize=8)
-        yticks = ElementParam(locs=1, ylabels=ylabels, offset=0.12, fontsize=8)
+        yticks = ElementParam(ymin=0, ymax=len(df.index), locs=major_yticks, labels=ytick_labels, fontsize=tick_label_fontsize, minor_locs=minor_yticks, ytick_label_rotation=ytick_label_rotation, offset=ytick_offset, hide=hide_yticks)
+
         fig = None
-        title = ElementParam(title=title, fontsize=20)
-        if legend is True:
-            legend = ElementParam(colorbar=True)
-        else:
-            legend = None
-        xlabel = ElementParam(label='Residue', fontsize=18)
-        ylabel = ElementParam(label='Residue', fontsize=18)
+        title = ElementParam(title=title, fontsize=title_fontsize, weight=title_weight)
 
-        axes = None
+        legend = ElementParam(colorbar=legend)
+        xlabel = ElementParam(label=x_label, fontsize=ax_label_fontsize, weight=weight)
+        ylabel = ElementParam(label=y_label, fontsize=ax_label_fontsize, weight=weight)
+
+        axes = ElementParam(off=False, semiopen=False, grid=False)
         if annotate is True:
             anno_data = df.round(2).to_numpy()
-            annotations = ElementParam(data=anno_data, fontsize=16)
+            annotations = ElementParam(data=anno_data, fontsize=annotation_fontsize, atype='heatmap')
         else:
             annotations = None
 

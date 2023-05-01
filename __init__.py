@@ -1,4 +1,4 @@
-from pymd.plot.plotter import Plotter
+from pymd.plot.plot_v2 import Plotter
 from pymd.plot.data import PlotData
 from pymd.mdanalysis.postprocess import PostProcess
 import os

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import sys
 import socket
+from pymd.plot import PlotData
 
 if os.name == 'posix':
     matplotlib.use('Agg')
@@ -24,7 +25,6 @@ if os.name == 'posix':
 class Plotter:
     def __init__(self, system=None):
         self.system = system
-
 
     def timeseries(self, pdata, fig=None, ax=None, show=True):
         # init plot
@@ -326,7 +326,93 @@ class Plotter:
             if show is True:
                 plt.show()
         return fig, ax
-    
+
+    def histogramPanel(self, data, ncols, nrows, title=None, axes=[], sharex=True, sharey=True, output=None, legend=True, legend_data=None, show=True, w = 8, scale = 1.0):
+        fig, ax = plt.subplots(nrows, ncols, sharex=sharex, sharey=sharey)
+        # fig = plt.figure() 
+        normal_w = w
+        normal_h = 6
+        fig_h = (normal_h * nrows) 
+        fig_w = (normal_w * ncols) + 2
+        fig.set_size_inches((fig_w*.9)*scale, (fig_h*.9)* scale)
+        print((fig_w*.9)*scale, (fig_h*.9)* scale)
+        # gs = GridSpec(ncols=ncols,nrows=nrows)
+        _axes = []
+        ax_index = 0
+        _min_x = None
+        _max_x = None
+        _min_y = None
+        _max_y = None
+        _xlabel = None
+        _ylabel = None
+        rows = []
+        i = 0
+        row = 0
+        col = 0
+        # if nrows > 1:
+        #     indeces = nrows
+        # else:
+        #     indeces = ncols
+        for x in range(0, len(data)):
+            pdata = data[i]
+            if x % ncols == 0:
+                row += 1
+            else:
+                if sharey:
+                    pdata.ylabel.label = None
+            if (row != nrows) and (sharex):
+                pdata.xlabel.label = None
+            # if sharex:
+            #     _xlabel = pdata.xlabel.label
+            #     pdata.xlabel.label = None
+            # if sharey:
+            #     _ylabel = pdata.ylabel.label
+            #     pdata.ylabel.label = None
+            if axes == []:
+                ax.flat[x] = self.histogram(pdata, fig=fig, ax=ax.flat[x], show=False)
+                _min_x, _max_x, _min_y, _max_y = self.minmax(ax.flat[x].get_xlim(), ax.flat[x].get_ylim(), _min_x, _max_x, _min_y, _max_y)
+                _axes.append(ax.flat[x])
+                i += 1
+            else:
+                ax.flat[x] = axes[ax_index]
+                _axes.append(axes[ax_index])
+                i += 1
+                ax_index += 1
+
+        import matplotlib.lines as mlines
+        if (legend_data is not None):
+            if (pdata.legend_data is not None) and (legend_data is None):
+                legend_data = pdata.legend_data
+            if legend is True:
+                handles = []
+                labels = []
+                for label, color in legend_data:
+                    if label == 'bstrand':
+                        label = r'$\beta$-Strand'
+                    handles.append(mlines.Line2D([], [], color=color, label=label))
+                    labels.append(label)
+                plt.figlegend(handles, labels, loc='lower center', ncol=4, fontsize=18)
+            # plt.legend(handles=handles, bbox_to_anchor=(-0.81, -0.15, 1.6, .102), loc='lower left',
+            # ncol=3, mode="expand", borderaxespad=0.)
+
+        if title is not None:
+            fig.suptitle(title, fontsize=20)
+        plt.tight_layout()
+        # fig.subplots_adjust(top=0.85)
+        #saving
+        if output is not None:
+            if output.endswith('png'):
+                plt.savefig(output, dpi=300)
+            if output.endswith('svg'):
+                plt.savefig(output)
+            print('Plotted {}'.format(output))
+            if show is True:
+                plt.show()
+        else:
+            if show is True:
+                plt.show()
+        return fig, ax
+
     def markerPlot(self, pdata, fig=None, ax=None, show=True):
 
         # init plot
@@ -829,8 +915,20 @@ class Plotter:
                 plt.show()
 
 
-    def histogram(self, pdata, show=True):
-        fig, ax = plt.subplots()
+    def histogram(self, pdata, fig=None, ax=None, show=True):
+        if (show is True) and (os.name == 'posix'):
+            print('A linux operating system is detected, plot output will not be shown')
+            show = False
+        panel = False
+        if fig is None:
+            fig, ax = plt.subplots()
+
+            if pdata.fig is None:
+                fig.set_size_inches(8,6)
+        else:
+            if pdata.fig is not None:
+                fig.set_size_inches(pdata.fig.width, pdata.fig.height)
+            panel = True
 
         if pdata.fig is None:
             fig.set_size_inches(8,6)
@@ -838,31 +936,26 @@ class Plotter:
             fig.set_size_inches(pdata.fig.width, pdata.fig.height)
 
         for d in pdata.data:
-            if (hasattr(d, 'alpha')) and (hasattr(d, 'color')):
-                ax.hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color, label=d.label)
-            elif hasattr(d, 'alpha'):
-                ax.hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha,label=d.label)
-            elif hasattr(d, 'color'):
-                ax.hist(d.x, bins=d.bins, density=d.density, color=d.color, label=d.label)
-            else:
-                ax.hist(d.x, bins=d.bins, density=d.density, label=d.label)
-            
+            ax.hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color, label=d.label)
 
         # labels and axes
         ax.set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
         ax.set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
 
-        if hasattr(pdata.xticks, 'locs'):
+        if (hasattr(pdata.xticks, 'locs')) and (pdata.xticks.locs is not None):
             ax.xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
+        if (hasattr(pdata.xticks, 'labels')) and (pdata.xticks.labels is not None):
+            print(pdata.xticks.labels)
+            ax.set_xticklabels(pdata.xticks.labels, rotation=pdata.xticks.xtick_label_rotation)
         # plt.xticks(fontsize=pdata.xticks.fontsize)
-        if hasattr(pdata.yticks, 'locs'):
+        if (hasattr(pdata.yticks, 'locs')) and (pdata.yticks.locs is not None):
             ax.yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
         # plt.yticks(fontsize=pdata.yticks.fontsize)
         ax.tick_params(axis='both', which='major', labelsize=pdata.xticks.fontsize)
 
-        if hasattr(pdata.xticks, 'minor_locs'):
+        if (hasattr(pdata.xticks, 'minor_locs')) and (pdata.xticks.minor_locs is not None):
             ax.xaxis.set_minor_locator(MultipleLocator(pdata.xticks.minor_locs))
-        if hasattr(pdata.yticks, 'minor_locs'):
+        if (hasattr(pdata.yticks, 'minor_locs')) and (pdata.yticks.minor_locs is not None):
             ax.yaxis.set_minor_locator(MultipleLocator(pdata.yticks.minor_locs))
 
 
@@ -876,10 +969,12 @@ class Plotter:
             if pdata.axes.grid is True:
                 ax.grid(b=True, which='major', axis='both', c='black', alpha=0.2)
 
-        ax.set_title(pdata.title.title, fontsize=pdata.title.fontsize)
+        # title
+        if pdata.title is not None:
+            ax.set_title(pdata.title.title, fontsize=pdata.title.fontsize, weight=pdata.title.weight)
 
-        ax.set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize)
-        ax.set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize)
+        ax.set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize, weight=pdata.xlabel.weight)
+        ax.set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize, weight=pdata.xlabel.weight)
 
         if (pdata.legend is not None) and (pdata.legend is not False):
             if hasattr(pdata.legend, 'ncol') and hasattr(pdata.legend, 'fontsize'):
@@ -899,263 +994,22 @@ class Plotter:
                 if annotation.atype == 'annotate':
                     plt.annotate(s=annotation.text, xy=annotation.xy, fontsize=annotation.fontsize)
 
-        if pdata.saveto is not None:
-            print(pdata.saveto)
-            if pdata.saveto.endswith('png'):
-                plt.savefig(pdata.saveto, dpi=300)
-            if pdata.saveto.endswith('svg'):
-                plt.savefig(pdata.saveto, dpi=300)
-            print('Plotted {}'.format(pdata.saveto))
-        else:
-            print('noshow')
-            print(pdata.saveto)
-            plt.show()
-        if show:
-            plt.show()
-        plt.close()
-
-    def histogramPanel(self, data, output, title):
-        if (len(data) % 2) == 0:
-            h = int(int(len(data)) / 2)
-        else:
-            h = int(int(len(data)+1) / 2)
-        w = 2
-        fig, ax = plt.subplots(h, w)
-        normal_w = 8
-        normal_h = 6
-        fig_h = (normal_h * h) 
-        fig_w = (normal_w * w) + 2
-        fig.set_size_inches(fig_w, fig_h)
-        i = 0
-        if h > 1:
-            for x in range(0, h):
-                for y in range(0, w):
-                    try:
-                        pdata = data[i]
-                    except:
-                        break
-                    for d in pdata.data:
-                        if (hasattr(d, 'alpha')) and (hasattr(d, 'color')):
-                            ax[x,y].hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color, label=d.label)
-                        elif hasattr(d, 'alpha'):
-                            ax[x,y].hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, label=d.label)
-                        elif hasattr(d, 'color'):
-                            ax[x,y].hist(d.x, bins=d.bins, density=d.density, color=d.color, label=d.label)
-                        else:
-                            ax[x,y].hist(d.x, bins=d.bins, density=d.density, label=d.label)
-                      
-
-                    # labels and axes
-                    ax[x,y].set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
-                    ax[x,y].set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
-
-                    if hasattr(pdata.xticks, 'locs'):
-                        ax[x,y].xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
-                    # plt.xticks(fontsize=pdata.xticks.fontsize)
-                    if hasattr(pdata.yticks, 'locs'):
-                        ax[x,y].yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
-                    # plt.yticks(fontsize=pdata.yticks.fontsize)
-                    ax[x,y].tick_params(axis='both', which='major', labelsize=pdata.xticks.fontsize)
-
-                    if hasattr(pdata.xticks, 'minor_locs'):
-                        ax[x,y].xaxis.set_minor_locator(MultipleLocator(pdata.xticks.minor_locs))
-                    if hasattr(pdata.yticks, 'minor_locs'):
-                        ax[x,y].yaxis.set_minor_locator(MultipleLocator(pdata.yticks.minor_locs))
-
-
-                    if pdata.axes.semiopen is True:
-                        ax[x,y].spines['right'].set_visible(False) # hide right axis
-                        ax[x,y].spines['top'].set_visible(False) # hide top axis
-                        ax[x,y].spines['right'].set_linewidth(10)
-                        ax[x,y].spines['top'].set_linewidth(10)
-
-                    if (hasattr(pdata.axes, 'grid')):
-                        if pdata.axes.grid is True:
-                            ax[x,y].grid(b=True, which='major', axis='both', c='black', alpha=0.2)
-
-                    ax[x,y].set_title(pdata.title.title, fontsize=pdata.title.fontsize)
-
-                    ax[x,y].set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize)
-                    ax[x,y].set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize)
-
-                    if (pdata.legend is not None) and (pdata.legend is not False):
-                        if hasattr(pdata.legend, 'ncol') and hasattr(pdata.legend, 'fontsize'):
-                            ax[x,y].legend(loc=pdata.legend.loc, fontsize=pdata.legend.fontsize, ncol=pdata.legend.ncol)
-                        elif hasattr(pdata.legend, 'fontsize'):
-                            ax[x,y].legend(loc=pdata.legend.loc, fontsize=pdata.legend.fontsize)
-                        elif hasattr(pdata.legend, 'ncol'):
-                            ax[x,y].legend(loc=pdata.legend.loc, ncol=pdata.legend.ncol)
-                        else:
-                           ax[x,y].legend(loc=pdata.legend.loc)
-                    # annotations
-                    if pdata.annotations is not None:
-                        for annotation in pdata.annotations:
-                            if annotation.atype == 'plot':
-                                ax[x,y].plot(annotation.x, annotation.y, linestyle=annotation.linestyle, color=annotation.color, linewidth=annotation.linewidth)
-                            if annotation.atype == 'annotate':
-                                plt.annotate(s=annotation.text, xy=annotation.xy, fontsize=annotation.fontsize)
-                    i += 1
-        else:
-            for x in range(0, w):
-                pdata = data[i]
-
-                for d in pdata.data:
-                    if (hasattr(d, 'alpha')) and (hasattr(d, 'color')):
-                        ax[x].hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color)
-                    elif hasattr(d, 'alpha'):
-                        ax[x].hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha)
-                    elif hasattr(d, 'color'):
-                        ax[x].hist(d.x, bins=d.bins, density=d.density, color=d.color)
-                    else:
-                        ax[x].hist(d.x, bins=d.bins, density=d.density)
-                  
-                # labels and axes
-                ax[x].set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
-                ax[x].set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
-
-                if hasattr(pdata.xticks, 'locs'):
-                    ax[x].xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
-                # plt.xticks(fontsize=pdata.xticks.fontsize)
-                if hasattr(pdata.yticks, 'locs'):
-                    ax[x].yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
-                # plt.yticks(fontsize=pdata.yticks.fontsize)
-                ax[x].tick_params(axis='both', which='major', labelsize=pdata.xticks.fontsize)
-
-                if hasattr(pdata.xticks, 'minor_locs'):
-                    ax[x].xaxis.set_minor_locator(MultipleLocator(pdata.xticks.minor_locs))
-                if hasattr(pdata.yticks, 'minor_locs'):
-                    ax[x].yaxis.set_minor_locator(MultipleLocator(pdata.yticks.minor_locs))
-
-
-                if pdata.axes.semiopen is True:
-                    ax[x].spines['right'].set_visible(False) # hide right axis
-                    ax[x].spines['top'].set_visible(False) # hide top axis
-                    ax[x].spines['right'].set_linewidth(10)
-                    ax[x].spines['top'].set_linewidth(10)
-
-                ax[x].set_title(pdata.title.title, fontsize=pdata.title.fontsize)
-
-
-                ax[x].set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize)
-                ax[x].set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize)
-
-                # annotations
-                if pdata.annotations is not None:
-                    for annotation in pdata.annotations:
-                        if annotation.atype == 'plot':
-                            ax[x].plot(annotation.x, annotation.y, linestyle=annotation.linestyle, color=annotation.color, linewidth=annotation.linewidth)
-                        if annotation.atype == 'annotate':
-                            plt.annotate(s=annotation.text, xy=annotation.xy, fontsize=annotation.fontsize)
-                i += 1
-
-        # remove last empty axis if any
-        if (len(data) % 2) != 0:
-            ax[h-1,w-1].remove()
-        # layout
-        fig.suptitle(title, fontsize=20)
-        plt.tight_layout(pad=7, h_pad=2, w_pad=2)
-        fig.subplots_adjust(top=0.9)
-        #saving
-        if output is not None:
-            if output.endswith('png'):
-                plt.savefig(output, dpi=300)
-            if output.endswith('svg'):
-                plt.savefig(output)
-            print('Plotted {}'.format(output))   
-        else:
-            plt.show()
-        plt.close()    
-
-    def barPlot(self, pdata):
-
-        # initialize fig, ax
-        fig, ax = plt.subplots()
-        if pdata.fig is None:
-            fig.set_size_inches(8,6)
-        else:
-            fig.set_size_inches(pdata.fig.width, pdata.fig.height)
-        
-        # plot data
-        rects = []
-        if not isinstance(pdata.data, list):
-            if pdata.data.color is None:
-                if 'stdev' in pdata.data.df.columns:
-                    rect = ax.bar(pdata.data.xpos, pdata.data.df['mean'], yerr=pdata.data.df['stdev'], width=pdata.data.width, label=pdata.data.label, ecolor='#5c5c5c', capsize=pdata.data.capsize, color='#a0b7d2')
-                else:
-                    rect = ax.bar(pdata.data.xpos, pdata.data.df['mean'], width=pdata.data.width, label=pdata.data.label, ecolor='#5c5c5c', capsize=pdata.data.capsize, color='#a0b7d2')
-            else:
-                if 'stdev' in pdata.data.df.columns:
-                    rect = ax.bar(pdata.data.xpos, pdata.data.df['mean'], yerr=pdata.data.df['stdev'], width=pdata.data.width, label=pdata.data.label, ecolor='#5c5c5c', capsize=pdata.data.capsize, color=pdata.data.color)
-                else:
-                    rect = ax.bar(pdata.data.xpos, pdata.data.df['mean'], width=pdata.data.width, label=pdata.data.label, ecolor='#5c5c5c', color=pdata.data.color)
-                # rect = ax.bar(pdata.data.xpos, pdata.data.df['mean'], width=pdata.data.width, label=pdata.data.label, ecolor='#5c5c5c', capsize=pdata.data.capsize, color=pdata.data.color)
-            rects.append(rect)
-        else:
-            for data in pdata.data:
-                print(data)
-                if data.color is None:
-                    rect = ax.bar(data.xpos, data.df['mean'], yerr=data.df['stdev'], width=data.width, label=data.label, ecolor='#5c5c5c', capsize=data.capsize, color='#a0b7d2')
-                else:
-                    rect = ax.bar(data.xpos, data.df['mean'], yerr=data.df['stdev'], width=data.width, label=data.label, ecolor='#5c5c5c', capsize=data.capsize, color=data.color)
-                rects.append(rect)
-        ax.axhline(color='black', linewidth=0.8)
-        # annotations
-        if pdata.annotations is not None:
-            for annotation in pdata.annotations:
-                if annotation.atype == 'autolabel':
-                    for rect in rects:
-                        caplines = rect.errorbar.lines[1][1]._y
-                        self.autolabel(rect, ax, caplines=caplines, fontsize=annotation.fontsize)
-        
-
-        # labels and ticks
-        if (hasattr(pdata.xticks, 'xmin')) and (hasattr(pdata.xticks, 'xmax')): 
-            ax.set_xlim(pdata.xticks.xmin, pdata.xticks.xmax)
-        if (hasattr(pdata.yticks, 'ymin')) and (hasattr(pdata.yticks, 'ymax')):
-            ax.set_ylim(pdata.yticks.ymin, pdata.yticks.ymax)
-
-
-        # ax.set_xticks(MultipleLocator(pdata.xticks.locs))
-        # ax.set_xticklabels(pdata.xticks.labels)
-        ax.xaxis.set_major_locator(MultipleLocator(pdata.xticks.locs))
-        plt.xticks(fontsize=pdata.xticks.fontsize)
-        if hasattr(pdata.yticks, 'locs'):
-            ax.yaxis.set_major_locator(MultipleLocator(pdata.yticks.locs))
-        if hasattr(pdata.yticks, 'minor_locs'):
-            ax.yaxis.set_minor_locator(MultipleLocator(pdata.yticks.minor_locs))
-        plt.yticks(fontsize=pdata.yticks.fontsize)
-
-        if pdata.xlabel.label is not None:
-            ax.set_xlabel(pdata.xlabel.label, fontsize=pdata.xlabel.fontsize, weight='bold')
-        if pdata.ylabel.label is not None:
-            ax.set_ylabel(pdata.ylabel.label, fontsize=pdata.ylabel.fontsize, weight='bold')
-
-        # axes
-        if pdata.axes.semiopen is True:
-            ax.spines['right'].set_visible(False) # hide right axis
-            ax.spines['top'].set_visible(False) # hide top axis
-            ax.spines['right'].set_linewidth(10)
-            ax.spines['top'].set_linewidth(10)
-
-        # title
-        if pdata.title.title is not None:
-            ax.set_title(pdata.title.title, fontsize=pdata.title.fontsize)
-
-        # legend
-        if pdata.legend is not None:
-            ax.legend(loc=pdata.legend.loc)
-
-        # saving
-        if pdata.saveto is not None:
-            if pdata.saveto.endswith('png'):
-                plt.savefig(pdata.saveto, dpi=600)
-            if pdata.saveto.endswith('svg'):
-                plt.savefig(pdata.saveto, dpi=300)
-            plt.close()
-            print('Plotted {}'.format(pdata.saveto))
-        else:
-            if os.name == 'nt':
+        if panel is False:
+            plt.tight_layout()
+            if pdata.saveto is not None:
+                if pdata.saveto.endswith('png'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                if pdata.saveto.endswith('svg'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                print('Plotted {}'.format(pdata.saveto))
+                plt.close()
+            elif show is False:
+                pass
+            elif show is True:
                 plt.show()
+            else:
+                plt.show()
+                plt.close()
         return ax
 
     def barPlotPanel(self, data, title, output=None):

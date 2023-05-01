@@ -54,7 +54,7 @@ class DSSP(Analysis):
             self.writeXVG(method='time')
             df = PostProcess.metadata(self.output, df=self.df)
         self.df = df
-        self.parent.df = self.df
+        # self.parent.df = self.df
         self.save()
 
         return self.df

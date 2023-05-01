@@ -412,7 +412,17 @@ class Protein:
         #                 last_residue_id = residue_id
         # return chains
 
-    
+    def renumber(self, chain, start):
+        new_chain = []
+        for residue in self.chains[chain]:
+            name = residue.name
+            residue.number = start
+            residue.id = '{}{}'.format(name, start)
+            new_chain.append(residue)
+            start += 1
+        self.chains[chain] = new_chain
+        return self.chains
+
     def getAtomCoordinates(self):
         atom_coords = {}
         for line in self.structureReader():
@@ -640,7 +650,10 @@ class Protein:
                 if (_d is None) or d < _d:
                     _d = d
         return _d
- 
+    
+    @staticmethod
+    def distance(x,y):
+        return np.sqrt((x[0]-y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
 
 class Residue:
 
@@ -684,7 +697,29 @@ class Residue:
                             hydrogen.hbond = True
                             hydrogen.electronegative = atom
 
-
+    @property
+    def com(self):
+        x = []
+        y = []
+        z = []
+        for atom in self.atoms:
+            mass = self.atomic_masses[atom.type]
+            x.append(atom.coordinates[0] * mass)
+            y.append(atom.coordinates[1] * mass)
+            z.append(atom.coordinates[2]* mass)
+        com_x = sum(x) / self.mass
+        com_y = sum(y) / self.mass
+        com_z = sum(z) / self.mass
+        com = (com_x, com_y, com_z)
+        return com
+    
+    @property
+    def mass(self):
+        residue_mass = 0
+        for atom in self.atoms:
+            mass = self.atomic_masses[atom.type]
+            residue_mass = residue_mass + mass
+        return residue_mass
     @staticmethod
     def distance(x,y):
         return np.sqrt((x.coordinates[0]-y.coordinates[0])**2 + (x.coordinates[1] - y.coordinates[1])**2 + (x.coordinates[2] - y.coordinates[2])**2)
@@ -710,10 +745,8 @@ class Atom:
                 self.coordinates = fixBadCoordinates(data[5:8])
 
         self.electronegative = None
-        if not self.name[0].isnumeric():
-            self.type = self.name[0]
-        else:
-            self.type = self.name[1]
+        self.type = data[-1][0]
+
         if self.name == 'H':
             self.hbond = True
         else:

@@ -351,3 +351,5 @@ class GMX:
             os.chdir(self.directory['scripts'])
             os.system('sbatch {}'.format(filename))
             os.chdir(home)
+
+    
