@@ -3,6 +3,7 @@ import os
 import sys
 import shutil
 import subprocess
+from pymd.mdsetup.mdsetup_dir import scriptdir
 # if sys.platform == 'win32':
 #     sys.path.append('D:/Work')
 #     import pymd
@@ -92,7 +93,7 @@ class Setup:
             # make run subfolders
             if (_dir != 'EM') and (_dir != 'build'):
                 for rep in range(1, self.reps+1):
-                    rep_path = os.path.join(directory[_dir]['root'], str(rep))
+                    rep_path = os.path.join(directory[_dir]['root'], 'rep{}'.format(str(rep)))
                     if not os.path.isdir(rep_path):
                         os.mkdir(rep_path)
                     directory[_dir][rep] = rep_path
