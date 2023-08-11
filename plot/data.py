@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import sys
 from cycler import cycler
-
+from collections.abc import Iterable
 from pandas.core.algorithms import isin
 import math
 
@@ -160,6 +160,10 @@ class PlotData:
                 if ('std' in df.columns):
                     if column == 'std':
                         break
+                elif column.endswith('_std'):
+                    continue
+                else:
+                    pass
 
             # decide labels for legend
             if labels is None:
@@ -191,6 +195,8 @@ class PlotData:
             else:
                 if 'std' in df.columns:
                     d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
+                elif '{}_std'.format(column) in df.columns:
+                    d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=df['{}_std'.format(column)], alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
                 else:
                     try:
                         assert average is True
@@ -280,8 +286,8 @@ class PlotData:
 
 
     @classmethod
-    def histogram(cls, df, title='', x_label='',y_label=None,  output=None, ymin=0, ymax=None, xmin=None, xmax=None, xpad=0.5, n_bins='auto', density=True, center=False, annotate=False, labels='columns', alpha=1, colors=None, legend=False, ncol=2, ignore=[], major_xticks=None, minor_xticks=None, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
-    legend_fontsize=12, semiopen=True, superlegend=False, grid=False, weight='regular', xtick_labels=None, xtick_label_rotation='horizontal', title_weight='bold'):
+    def histogram(cls, df, title='', x_label=None,y_label=None,  output=None, ymin=0, ymax=None, xmin=None, xmax=None, xpad=0.5, n_bins='auto', density=True, center=False, annotate=False, labels='columns', alpha=1, colors=None, legend=False, ncol=2, ignore=[], major_xticks=None, minor_xticks=None, major_yticks=None, minor_yticks=None, tick_label_fontsize=14, ax_label_fontsize=18, title_fontsize=20,
+    legend_fontsize=12, semiopen=True, superlegend=False, grid=False, weight='regular', xtick_labels=None, xtick_label_rotation='horizontal', title_weight='bold', legend_loc='upper right'):
         if colors is None:
             # colors = ['#1f464c', '#2a8a2d', '#8a47b0', '#9bcccc']
             colors = plt.cm.tab20b(np.linspace(0, 1,len(df.columns)))
@@ -300,15 +306,16 @@ class PlotData:
             # decide labels for legend
             label = cls.label(df, column, i, labels)
             # decide color
-            colors = cls.color(colors, column, i)
+            # colors = cls.color(colors, column, i)
             
             #  bins
             if (n_bins == 'auto') or (isinstance(n_bins, str)):
                 n_bins = math.ceil(1 + (3.322 * math.log(len(df[column]))))
+            print(n_bins)
             # k=100
             x = df[column]
-
-            d = Data(df=df, x=x, bins=n_bins, density=density, alpha=alpha, color=colors, label=label)
+            print(colors, colors[i])
+            d = Data(df=df, x=x, bins=n_bins, density=density, alpha=alpha, color=colors[i], label=label)
             data.append(d)
             i += 1
             # calculate ymax
@@ -342,7 +349,7 @@ class PlotData:
         axes = ElementParam(off=False, semiopen=semiopen, grid=grid)
 
         if (legend is not False) and (legend is not None):
-            legend = ElementParam(loc='upper right', ncol=ncol, fontsize=legend_fontsize)
+            legend = ElementParam(loc=legend_loc, ncol=ncol, fontsize=legend_fontsize)
 
 
         annotations = None
@@ -1301,44 +1308,79 @@ class PlotData:
         return cls('heatmap',data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     
     @classmethod
-    def barplot(cls, df, labels=None, color='#9bcccc', title=None, xlabel=None, ylabel=None, ymin=0, ymax=10, locs=20, minor_locs=5, xlim=None, annotations=True, output=None):
-        if labels is None:
-            data = Data(df=df, color=color, label=None, width=1, xpos=[i for i in range(len(df.index))], capsize=4)
+    def bar(cls, df, x='default', width=1, tick_label=None, color='#9bcccc', alpha=1, title=None, xlabel=None, title_fontsize=20, title_weight='bold', tick_label_fontsize=14, label_fontsize=16, weight='bold', ylabel=None, ymin=0, ymax=None, xmin=None, xmax=None, locs=20, minor_locs=5, xlim=None, capsize=1, capthick=0, elinewidth=1, ecolor=None, orientation='vertical', annotations=True, std=pd.DataFrame(), output=None, bar_labels=None, bar_padding=3, bar_fmt='', bar_fontsize=12):
+        if x == 'default':
+            x = [i for i in range(len(df.index))]
+        elif x == 'index':
+            x = df.index
         else:
-            data = Data(df=df, color=color, label=None, width=1, xpos=[i for i in range(len(df.index))], capsize=4)
+            if not isinstance(x, Iterable):
+                raise ValueError("x must be 'default', 'index', or an iterable")
+        if isinstance(df, pd.Series):
+            values = np.reshape(df.values, -1)
+        elif (isinstance(df, pd.DataFrame)) or (isinstance(df, np.ndarray)):
+            if len(df.shape) > 1:
+                values = np.reshape(df.values, -1)
+            else:
+                values = df.values
+        if len(values) != len(x):
+            raise ValueError('bar coordinates length ({}) does not match the length of values to plot ({})'.format(len(x), len(np.reshape(df.values, -1))))
+        error_kw = {
+            'capsize':capsize,
+            'capthick':capthick,
+            'elinewidth':elinewidth,
+            'ecolor':ecolor
+        }
+        if std.empty:
+            err = None
+        else:
+            err = np.reshape(std.values, -1)
+        data = [Data(df=df, x=x, values=values, color=color, tick_label=tick_label, width=width, err=err, error_kw=error_kw, orientation=orientation, alpha=alpha)]
 
-        # if labels is None:
-        #     if xlim is None:
-        #         xticks = ElementParam(labels=list(df.index), fontsize=14, locs=[i for i in range(len(df.index))])
-        #     else:
-        #         xticks = ElementParam(labels=list(df.index), fontsize=14, locs=[i for i in range(len(df.index))], xmin=xlim[0],xmax=xlim[1])
-        # else:
-        #    xticks = ElementParam(labels=labels, fontsize=14, locs=[i for i in range(len(df.index))])
-        xticks = ElementParam(labels=list(df.index), fontsize=14, locs=20, xmin=xlim[0],xmax=xlim[1])
+        if xmin is None:
+            xmin = min(x)
+        if xmax is None:
+            xmax = max(x)
+        if ymin is None:
+            ymin = min(values)
+        if ymax is None:
+            ymin = max(values)
+
+        if orientation == 'vertical':
+            _xlocs = None
+            _xlocs_minor = None
+            _ylocs = locs
+            _ylocs_minor = minor_locs
+        else:
+            _xlocs = locs
+            _xlocs_minor = minor_locs
+            _ylocs = None
+            _ylocs_minor = None
+        xticks = ElementParam(labels=tick_label, locs=_xlocs, minor_locs=_xlocs_minor, fontsize=tick_label_fontsize, xmin=xmin,xmax=xmax)
     
-        yticks = ElementParam(ymin=ymin, ymax=ymax, locs=locs, minor_locs=minor_locs, fontsize=14)   
+        yticks = ElementParam(labels=tick_label, ymin=ymin, ymax=ymax, locs=_ylocs, minor_locs=_ylocs_minor, fontsize=tick_label_fontsize)   
 
         fig = None
 
-        xlabel = ElementParam(label=xlabel, fontsize=16)
-        ylabel = ElementParam(label=ylabel, fontsize=16)
+        xlabel = ElementParam(label=xlabel, fontsize=label_fontsize, weight=weight)
+        ylabel = ElementParam(label=ylabel, fontsize=label_fontsize, weight=weight)
 
         if title is not None:
-            title = ElementParam(title=title, fontsize=20)
+            title = ElementParam(title=title, fontsize=title_fontsize, weight=title_weight)
         else:
-            title = ElementParam(title='Bar Plot', fontsize=20)
+            title = ElementParam(title='', fontsize=2, weight=title_weight)
 
         legend = None
 
         axes = ElementParam(off=False, semiopen=True)
         if annotations:
-            annotations = [ElementParam(atype='autolabel', fontsize=10)]
+            annotations = [ElementParam(atype='autolabel', labels=bar_labels, fmt=bar_fmt, padding=bar_padding, fontsize=bar_fontsize)]
         else:
             annotations = None
 
         saveto = output
 
-        return cls(data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
+        return cls('bar', data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
    
    
     '''

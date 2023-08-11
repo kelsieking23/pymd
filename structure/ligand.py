@@ -6,14 +6,16 @@
 ####################################################################################################################
 import os
 import numpy as np
-from pymd.structure.protein import Atom
+
 
 class Ligand:
 
-    def __init__(self, structure, name=None, model=None, ignh=False):
+    def __init__(self, structure, name=None, model=None, chain=None, res=None, ignh=False):
         self.structure = structure
         self.name = name
         self.ignh = ignh
+        self.chain = chain
+        self.res = res
         model_coords = self.split(ignh)
         if model is not None:
             if isinstance(model_coords, dict):
@@ -350,6 +352,30 @@ class Bonding:
                         # return self.findCarbonRings(start=ref_atom_num, ref_atom_num=atom_num, visited=visited)
 
 
+class Atom:
+    def __init__(self, data, residue):
+        self.residue = residue
+        self.name = data[2]
+        self.number = int(data[1])
+        self.index = self.number-1
+        if not data[4].isnumeric():
+            try:
+                self.coordinates = list(map(float, data[6:9]))
+            except:
+                self.coordinates = fixBadCoordinates(data[6:9])
+        else:
+            try:
+                self.coordinates = list(map(float, data[5:8]))
+            except:
+                self.coordinates = fixBadCoordinates(data[5:8])
+
+        self.electronegative = None
+        self.type = data[-1][0]
+
+        if self.name == 'H':
+            self.hbond = True
+        else:
+            self.hbond = False
 
 class SingleLigand(Ligand):
 

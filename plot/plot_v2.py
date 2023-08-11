@@ -16,7 +16,9 @@ if os.name == 'posix':
 
 class Plotter():
 
-    def __init__(self, nrows=1, ncols=1, sharex=False, sharey=False, w=8, h=6):
+    def __init__(self, nrows=1, ncols=1, sharex=False, sharey=False, w=8, h=6, font='default'):
+        if not font == 'default':
+            plt.rcParams['font.family'] = font
         self.fig, self.axes = plt.subplots(nrows, ncols, sharex=sharex, sharey=sharey)
         self.fig.set_size_inches(w,h)
         self.pdata = PlotData(*[None]*14)
@@ -28,12 +30,13 @@ class Plotter():
         self.h = h
 
 
-    def graph(self, pdata, ax, **kwargs):
+    def graph(self, pdata, ax, container=None, **kwargs):
         '''
         Controls the specs of the graph. 
         Arguments:
         - pdata (pymd.plot.PlotData): plot data object
         - ax (matplotlib.axes.Axes): current axis
+        - container (matplotlib.axes)
         - **kwargs: mostly just for msc things. such as passing img from pcolor to draw a colorbar. 
         '''
         # labels and axes
@@ -118,16 +121,19 @@ class Plotter():
                 for annotation in pdata.annotations:
                     if annotation.atype == 'plot':
                         ax.plot(annotation.x, annotation.y, linestyle=annotation.linestyle, color=annotation.color, linewidth=annotation.linewidth)
-            annotation = pdata.annotations
-            if annotation.atype == 'annotate':
-                plt.annotate(s=annotation.text, xy=annotation.xy, fontsize=annotation.fontsize)
-            elif annotation.atype == 'heatmap':
-                for i in range(0, len(pdata.data.df.index)):
-                    for j in range(0, len(pdata.data.df.columns)):
-                        anno = pdata.annotations.data[i,j]
-                        ax.text(j+0.5, i+0.5, anno, ha="center", va="center", color='w', fontsize=pdata.annotations.fontsize)
+                    if annotation.atype == 'autolabel':
+                        ax.bar_label(container, labels=annotation.labels, fmt=annotation.fmt, padding=annotation.padding)
             else:
-                pass
+                annotation = pdata.annotations
+                if annotation.atype == 'annotate':
+                    plt.annotate(s=annotation.text, xy=annotation.xy, fontsize=annotation.fontsize)
+                elif annotation.atype == 'heatmap':
+                    for i in range(0, len(pdata.data.df.index)):
+                        for j in range(0, len(pdata.data.df.columns)):
+                            anno = pdata.annotations.data[i,j]
+                            ax.text(j+0.5, i+0.5, anno, ha="center", va="center", color='w', fontsize=pdata.annotations.fontsize)
+        else:
+            pass
         return ax
     
     def timeseries(self, df, panel=False, ax=None, show=False, **kwargs):
@@ -213,7 +219,7 @@ class Plotter():
                 plt.close()
         return ax
 
-    def histogram(self, df, panel=False, ax=None, **kwargs):
+    def histogram(self, df, panel=False, show=True, ax=None, **kwargs):
         if panel is True:
             for (i, col) in enumerate(df.columns):
                 data = pd.DataFrame()
@@ -229,8 +235,66 @@ class Plotter():
             for d in pdata.data:
                 ax.hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color, label=d.label)
                 ax = self.graph(pdata, ax)
+            plt.tight_layout()
+            if pdata.saveto is not None:
+                if pdata.saveto.endswith('png'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                if pdata.saveto.endswith('svg'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                print('Plotted {}'.format(pdata.saveto))
+                if show is True:
+                    plt.show()
+            elif show is False:
+                pass
+            elif show is True:
+                plt.show()
+            else:
+                plt.show()
+                plt.close()
         return ax
 
+    def bar(self, df, panel=False, ax=None, show=False, **kwargs):
+        if panel is True:
+            for (i, col) in enumerate(df.columns):
+                data = pd.DataFrame()
+                data[col] = df[col]
+                self.axes.flat[i] = self.bar(data, panel=False, ax=self.axes.flat[i], **kwargs)
+            self._fix_labels()
+            return self.axes
+        else:
+            if ax is None:
+                ax = self.axes
+            if not isinstance(df, (list, tuple, set)):
+                dfs = [df]
+            else:
+                dfs = df
+            for df in dfs:
+                pdata = PlotData.bar(df, **kwargs)
+                self.pdata = pdata
+                for d in pdata.data:
+                    if d.orientation == 'vertical':
+                        rects = ax.bar(d.x, d.values, color=d.color, tick_label=d.tick_label, width=d.width,alpha=d.alpha, yerr=d.err, error_kw=d.error_kw)
+                    elif d.orientation == 'horizontal':
+                        rects = ax.barh(d.x, d.values, color=d.color, tick_label=d.tick_label, width=d.width,alpha=d.alpha, xerr=d.err, error_kw=d.error_kw)
+                    ax = self.graph(pdata, ax, container=rects)
+        if panel is False:
+            plt.tight_layout()
+            if pdata.saveto is not None:
+                if pdata.saveto.endswith('png'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                if pdata.saveto.endswith('svg'):
+                    plt.savefig(pdata.saveto, dpi=300)
+                print('Plotted {}'.format(pdata.saveto))
+                if show is True:
+                    plt.show()
+            elif show is False:
+                pass
+            elif show is True:
+                plt.show()
+            else:
+                plt.show()
+                plt.close()
+        return ax
     def panel(self, _type, df, ax, **kwargs):
         pass
 

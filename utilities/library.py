@@ -3,7 +3,8 @@ def residues():
     return ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
 
 def lipids():
-    return ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC']
+    return ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC', 'POPI', 'POPG',
+            'CER1']
 
 def ions():
     return ['k'.upper(), 'cl'.upper(), 'na'.upper(), 'sod'.upper(), 'cla'.upper()]
@@ -32,3 +33,8 @@ def headgroup_ids():
      headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11']
      return [hg.upper() for hg in headgroup_ids]
 
+def dna():
+     return ['DT', 'DC', 'DA', 'DG', 'DU']
+
+def lipid():
+     return ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC']

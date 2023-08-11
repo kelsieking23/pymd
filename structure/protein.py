@@ -10,11 +10,13 @@ import sys
 
 # imports from pymd
 sys.path.append(os.getcwd())
+from pymd.structure.ligand import Ligand
 from pymd.utilities.rewritepdb import addChainID
 from pymd.utilities.rewritepdb import writePDB
 from pymd.utilities.rewritepdb import editChainIDResidue
 from pymd.utilities.pdbhelper import fixBadCoordinates
 from pymd.mdanalysis.multixpm import MultiXPM
+from pymd.utilities import library
 
 
 class Protein:
@@ -70,7 +72,8 @@ class Protein:
             'N':14.007,
             'H':1.008,
             'O':15.999,
-            'S':32.06
+            'S':32.06,
+            'P':30.974
         }
         # check structure file
         extension = self.structure[-3:]
@@ -85,6 +88,7 @@ class Protein:
         self.coordinates = self.getResidueCoordinates()
         self.atom_coordinates = self.getAtomCoordinates()
         self.residues = self.getResidues()
+        self.atoms = self.getAtoms()
         self.chains = self.getChains()
         self.peptides = len(self.chains.keys())
         # self.structure_data = self.getStructureData()
@@ -257,8 +261,6 @@ class Protein:
         return (nterm, cterm)
     
 
-
-
     def addChainID(self, nterm, cterm):
         new_filename = self.structure.split('.')[0] + '_chainid.pdb'
         return addChainID(self.structure, new_filename, nterm, cterm)
@@ -349,17 +351,11 @@ class Protein:
                     if residue_id in self.ids:
                         if residue_id not in residue_coords.keys():
                             residue_coords[residue_id] = []
+                        try:
                             current_res_coords = list(map(float, line_parts[6:9]))
-                            try:
-                                residue_coords[residue_id].append(current_res_coords)
-                            except:
-                                current_res_coords = fixBadCoordinates(line_parts[6:9])
-                        else:
-                            try:
-                                current_res_coords = list(map(float, line_parts[6:9]))
-                            except:
-                                current_res_coords = fixBadCoordinates(line_parts[6:9])
-                            residue_coords[residue_id].append(current_res_coords)
+                        except:
+                            current_res_coords = fixBadCoordinates(line_parts[6:9])
+                        residue_coords[residue_id].append(current_res_coords)
                     else:
                         continue
                 else:
@@ -527,7 +523,30 @@ class Protein:
         for res_id in atom_types.keys():
             atom_types[res_id] = list(enumerate(atom_types[res_id]))
         return atom_types
-
+    
+    def getCOM(self, residues=[]):
+        residue_coms = {}
+        x = []
+        y = []
+        z = []
+        i = 0
+        residue_mass = 0
+        for residue in residues:
+            residue_id = residue.id
+            residue_mass += self.masses[residue_id]
+            for atom in residue.atoms:
+                atom_type = atom.type
+                mass = self.atomic_masses[atom_type]
+                x.append(atom.coordinates[0] * mass)
+                y.append(atom.coordinates[1] * mass)
+                z.append(atom.coordinates[2]* mass)
+                i += 1
+        com_x = sum(x) / residue_mass
+        com_y = sum(y) / residue_mass
+        com_z = sum(z) / residue_mass
+        com = (com_x, com_y, com_z)
+        return com
+    
     def getResidueCOM(self):
         '''
         Gets residue center of mass for all residues. 
@@ -638,6 +657,12 @@ class Protein:
         residues.append(residue)
         return residues
 
+    def getAtoms(self):
+        atoms = []
+        for residue in self.residues:
+            for atom in residue.atoms:
+                atoms.append(atom)
+        return atoms
     def ligandInteraction(self):
         coms = self.getResidueCOM()
     
@@ -655,33 +680,87 @@ class Protein:
     def distance(x,y):
         return np.sqrt((x[0]-y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
 
+
 class Residue:
 
     def __init__(self, data, index):
         self.index = index
         first_line = data[0]
-        self.name = first_line[3]
-        try:
-            self.number = int(first_line[5])
-        except:
-            self.number = int(first_line[4])
-        self.id = self.name + str(self.number)
-        self.chain = first_line[4]
-        self.atoms = []
-        self.hydrogens = []
-        for line_parts in data:
-            atom = Atom(data=line_parts, residue=self)
-            self.atoms.append(atom)
-            if 'H' in atom.name:
-                self.hydrogens.append(atom)
         self.atomic_masses = {
             'C':12.011,
             'A':12.011,
             'N':14.007,
             'H':1.008,
             'O':15.999,
-            'S':32.06
+            'S':32.06,
+            'P':30.974
         }
+        self.restype = None
+        if self.isResidue(data):
+            self.getResidueData(data)
+        elif self.isNucleic(data):
+            self.getResidueData(data)
+        elif self.isLipid(data):
+            self.getResidueData(data)
+        else:
+            # print('idk what this residue is :(')
+            self.getResidueData(data)
+    def isResidue(self, data):
+        residue_name = data[0][3]
+        if residue_name not in library.residues():
+            return False
+        self.restype = 'residue'
+        return True
+        
+    def isNucleic(self, data):
+        residue_name = data[0][3]
+        if residue_name not in library.dna():
+            return False
+        self.restype = 'nucleic'
+        return True
+
+    def isLipid(self, data):
+        residue_name = data[0][3]
+        if residue_name.startswith(tuple(library.lipid())):
+            return False
+        self.restype = 'lipid'
+        return True
+    
+    @staticmethod
+    def linecheck(line_parts):
+        if not line_parts[4].isalpha():
+            chain_id = ''.join([char for char in line_parts[4] if char.isalpha()])
+            resnum = ''.join([char for char in line_parts[4] if char.isnumeric()])
+            new_line_parts = []
+            for k, item in enumerate(line_parts):
+                if k < 4:
+                    new_line_parts.append(item)
+                elif k == 4:
+                    new_line_parts.append(chain_id)
+                    new_line_parts.append(resnum)
+                else:
+                    new_line_parts.append(item)
+            return new_line_parts
+        return line_parts
+
+    def getResidueData(self, data):
+        first_line = data[0]
+        first_line_clean = self.linecheck(first_line)
+        self.name = first_line_clean[3]
+        try:
+            self.number = int(first_line_clean[5])
+        except:
+            self.number = int(first_line_clean[4])
+        self.num = self.number
+        self.id = self.name + str(self.number)
+        self.chain = first_line_clean[4]
+        self.atoms = []
+        self.hydrogens = []
+        for line_parts in data:
+            atom = Atom(data=self.linecheck(line_parts), residue=self)
+            self.atoms.append(atom)
+            if 'H' in atom.name:
+                self.hydrogens.append(atom)
         self.getHydrogenConnections()
 
     def getHydrogenConnections(self):

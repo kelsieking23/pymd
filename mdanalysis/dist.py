@@ -41,6 +41,7 @@ class Distance(Analysis):
         self._iterload = False
         self.method = None
         self.matrix = pd.DataFrame()
+        self.verbose = False
         self.__dict__.update(kwargs)
 
     @staticmethod
@@ -116,6 +117,15 @@ class Distance(Analysis):
                     p.append([i,k])
         return np.array(p)
 
+    def exclude_chains_residue(self, pairs):
+        p = []
+        for pair in pairs:
+            i = pair[0]
+            k = pair[1]
+            if self.top.residue(i).chain.index != self.top.residue(k).chain.index:
+                p.append([i,k])
+        return np.array(p)
+
     def saltbridge_selection(self):
         sele = self.top.select('(name NZ and resn LYS)')
         sele = np.append(sele, self.top.select('(name OE1 and resn GLU)'))
@@ -143,24 +153,48 @@ class Distance(Analysis):
             p.append([ri, ligand_index])
         return np.array(p)
 
-    def run(self, method='residue', output='dist.csv',residues=[], cutoff=0.35, **kwargs):
+    def run(self, method='residue', output='dist.csv',residues=[], pairs = [], cutoff=0.35, **kwargs):
         self._output = output
         self.method = method
+        if self.verbose:
+            print('Writing job data...')
         self.save()
+        if self.verbose:
+            print('Job data written')
+            print('Method: {}'.format(method))
         if method == 'atom':
             df = self.by_atom()
             return df
         elif method == 'residue':
             # pairs = self.pairs()
-            if residues == []:
-                pairs = self.residue_pairs([i for i in range(self.traj.n_residues)])
+            if self.verbose:
+                print('Generating pairs...')
+            if len(pairs) == 0:
+                if residues == []:
+                    pairs = self.residue_pairs([i for i in range(self.traj.n_residues)])
+                    if self.verbose:
+                        print('Pairs generated. There are {} pairs'.format(len(pairs)))
+                        if self._exclude_chain:
+                            if self.verbose:
+                                print('Making chain exclusions...')
+                            pairs = self.exclude_chains_residue(pairs)
+                            if self.verbose:
+                                print('Exclusions complete. There are now {} pairs'.format(len(pairs)))
+                else:
+                    pairs = self.residue_pairs([res.index for res in self.top.residues if res.resSeq in residues])
+                    if self.verbose:
+                        print('Pairs generated. There are {} pairs'.format(len(pairs)))
             else:
-                # for res in self.top.residues:
-                    # if (res.resSeq in residues):
-                    #     print(res.name, res.resSeq, res.index)
-                pairs = self.residue_pairs([res.index for res in self.top.residues if res.resSeq in residues])
-            if self._exclude_chain:
-                pairs = self.exclude_chains(pairs, method='residue')
+                try:
+                    if not isinstance(pairs, np.ndarray):
+                        pairs = np.array(pairs)
+                except:
+                    print('There was an error converting your pairs list to a np.ndarray')
+                    pairs = np.array(pairs)
+                if self.verbose:
+                    print('Pairs given. There are {} pairs'.format(len(pairs)))
+            if self.verbose:
+                print('Launching distance calculation...')
             df = self.by_residue(contact_pairs=pairs, **kwargs)
             return df
         elif method == 'saltbridge':
@@ -211,6 +245,9 @@ class Distance(Analysis):
     def by_residue(self, contact_pairs, squareform=False, **kwargs):
         if self.parent is not None:
             print('Computing residue contacts for {}...'.format(self.parent.id))
+        else:
+            if self.verbose:
+                print('Computing contacts...')
         distances, pairs = mdtraj.compute_contacts(self.traj, contacts=contact_pairs, **kwargs) # type: ignore
         # sq = mdtraj.geometry.squareform(distances, pairs)
         distances = pd.DataFrame(distances)
@@ -219,9 +256,12 @@ class Distance(Analysis):
         self.df = distances
         # if squareform:
         #     self.df = sq
+        if self.verbose:
+            print('Calculation complete.')
         if self.output is not None:
-            print('Writing {}'.format(self.output))
-            print('Shape: {}'.format(self.df.shape))
+            if self.verbose:
+                print('Writing {}'.format(self.output))
+                print('Shape: {}'.format(self.df.shape))
             self.df.to_csv(self.output)
         return self.df
 
@@ -357,12 +397,19 @@ class Distance(Analysis):
     def squareform(self, frames=(0,-1)):
         pairs = [col.split('_') for col in self.df.columns]
         pairs = np.array([list(map(int, pair)) for pair in pairs])
-        distances = self.df.loc[frames[0]:frames[-1],:].to_numpy()
+        distances = self.df.iloc[frames[0]:frames[-1],:].to_numpy()
+        print(distances.shape)
         squares = mdtraj.geometry.squareform(distances, pairs)
+        print(squares.shape)
         dfs = []
+        # columns=[residue.index for residue in self.top.residues]
+        # index=[residue.index for residue in self.top.residues]
+        index = [pair[0] for pair in pairs]
+        columns = [pair[1] for pair in pairs]
         for sq in squares:
-            df = pd.DataFrame(sq, columns=[residue.index for residue in self.top.residues],
-                                index=[residue.index for residue in self.top.residues])
+            # df = pd.DataFrame(sq, columns=columns,
+            #                     index=index)
+            df = pd.DataFrame(sq)
             dfs.append(df)
         return dfs
 

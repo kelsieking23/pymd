@@ -72,6 +72,27 @@ def addChainID(filename, newfilename, nterm, cterm):
     # return list of edited contents
     return newfilename
 
+def addChainID_CHARMM(inp, out):
+    newcontents = []
+    f = open(inp, 'r')
+    contents = f.readlines()
+    f.close()
+    for line in contents:
+        if not line.startswith(('ATOM', 'HETATM',)):
+            newcontents.append(line.split())
+            continue
+        parts = line.split()
+        segid = parts[-2]
+        if segid.startswith('PRO'):
+            chain_id = segid[3:]
+            _parts = parts[:]
+            parts = _parts[0:4] + [chain_id] + _parts[4:]
+        newcontents.append(parts)
+        if parts[3] == 'CER1':
+            print(parts)
+
+    writePDB(newcontents, out)
+
 def renumberPDB(filename, newfilename, nterm, cterm):
     # initialize variables
     contents = [] # hold .pdb file contents
@@ -467,10 +488,12 @@ def editChainIDResidue(filename, newfilename, nterm, cterm, sm=None):
 
 
 def writePDB(data, newfilename):
-    print(newfilename)
+    # print(newfilename)
     f = open(newfilename, 'w')
     ter = False
     for line in data:
+        if line == []:
+            continue
         if ('TER' in line):
             # if ([data][-1] == ['TER']) or ([data][-1] == 'TER'):
             #     ter = True
@@ -478,9 +501,9 @@ def writePDB(data, newfilename):
             #     f.write(string)
             #     break
             ter = True
-            string = '{}'.format(line)
+            string = '{}\n'.format(line[0])
             f.write(string)
-            break
+            # break
         elif (line[0] == 'ATOM') or (line[0] == 'HETATM'):
             atom_name = line[2]
             atom_symbol = line[2][0]
@@ -500,16 +523,29 @@ def writePDB(data, newfilename):
                         line[5] = xyz[0]
                         line[6] = xyz[1]
                         line[7] = xyz[2]
-                if len(atom_name) > 3:
-                    if len(line[-1]) == 1:
-                        string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>12s}\n'.format(*line)
+                if line[0].startswith('ATOM'):
+                    if len(atom_name) > 3:
+                        if len(line[-1]) == 1:
+                            string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
+                        else:
+                            string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
                     else:
-                        string = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
+                        if len(line[-1]) == 1:
+                            string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
+                        else:
+                            string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
+                #### HETATM
                 else:
-                    if len(line[-1]) == 1:
-                        string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>12s}\n'.format(*line)
+                    if len(atom_name) > 3:
+                        if len(line[-1]) == 1:
+                            string = '{:<4s}{:>5s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
+                        else:
+                            string = '{:<4s}{:>5s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
                     else:
-                        string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
+                        if len(line[-1]) == 1:
+                            string = '{:<4s}{:>5s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
+                        else:
+                            string = '{:<4s}{:>5s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s}\n'.format(*line)
             else:
                 if isinstance(line[5], str):
                     xyz = list(map(float, line[5:8]))
@@ -517,9 +553,9 @@ def writePDB(data, newfilename):
                     line[6] = xyz[1]
                     line[7] = xyz[2]
                 if len(atom_name) > 3:
-                    string = '{:<4s}{:>7s} {:^4s} {:>3s}  {:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>12s}\n'.format(*line)
+                    string = '{:<4s}{:>7s} {:^4s} {:>3s} {:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
                 else:
-                    string = '{:<4s}{:>7s}  {:<4s}{:>3s}  {:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>12s}\n'.format(*line)
+                    string = '{:<4s}{:>7s}  {:<4s}{:>3s} {:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>3s}  {:>3s}{:>10s} {}\n'.format(*line)
             f.write(string)
         else:
             string = '{}'.format(line)

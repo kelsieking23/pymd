@@ -1,12 +1,14 @@
 import os
 import json
 import pandas as pd
+import numpy as np
 from datetime import datetime
 import mdtraj
 from pymd.mdanalysis.postprocess import PostProcess
 import multiprocessing as mp
 from pymd.utilities.rewritepdb import writePDB
 from collections.abc import Iterable
+from pymd.utilities.library import lipids, residues
 
 class Analysis:
 
@@ -23,6 +25,7 @@ class Analysis:
         self.job_name = 'analysis'
         self.job_params = {}
         self.load_state = False
+        self.verbose = True
         self.__dict__.update(kwargs)
 
     
@@ -131,33 +134,68 @@ class Analysis:
         return root
 
     def loadTrajectory(self, stride=100, selection='backbone', b=0, e=-1):
+        if self.verbose:
+            print('Loading {}...'.format(self.inp))
         if stride != 0:
-            traj = mdtraj.load(self.inp, top=self.topfile, stride=stride)
+            self._traj = mdtraj.load(self.inp, top=self.topfile, stride=stride)
         else:
-            traj = mdtraj.load(self.inp, top=self.topfile)
-        traj = traj.superpose(traj)
-        self._traj = traj.center_coordinates()
+            self._traj = mdtraj.load(self.inp, top=self.topfile)
 
+        if self.verbose:
+            print(f'Slicing selection: "{selection}" ...')
         if selection != 'all':
             if isinstance(selection, str):
-                sele = self._traj.top.select(selection)
-                traj = self._traj.atom_slice(sele)
-            if isinstance(selection, Iterable):
-                traj = self._traj.atom_slice(selection)
-        self.traj = traj
+                if (not selection == ''):
+                    sele = self._traj.top.select(selection)
+                    self.traj = self._traj.atom_slice(sele)
+                else:
+                    self.traj = self._traj
+            elif isinstance(selection, (list, tuple, pd.DataFrame)):
+                self.traj = self._traj.atom_slice(np.array(selection))
+            elif isinstance(selection, np.ndarray):
+                self.traj = self._traj.atom_slice(selection)
+            elif (selection is None):
+                self.traj = self._traj
+            else:
+                raise ValueError('Selection must be string, list, tuple, np.ndarray, or None')
+        else:
+            self.traj = self._traj
+
         if (e == -1):
             self.traj = self.traj[b:]
             # self.traj = traj[b:]
         else:
-            self.traj = traj[b:e]
+            if self.verbose:
+                print(f'Slicing interval: ({b}, {e})')
+            self.traj = self._traj[b:e]
             # self.traj = traj[b:e]
         self.stride = stride
         self.selection=selection
         self.b = b
         self.e = e
         self.frames = self.traj._xyz
+        if self.verbose:
+            print('Trajectory loaded.')
+            print(self.traj)
+            print(f'Trajectory shape {self.traj._xyz.shape}')
         # self.top = self.traj.topology
         return self
+
+    def superpose(self):
+        if self.traj is not None:
+            self.traj = self.traj.superpose(self.traj)
+            return self.traj
+        else:
+            print('Trajectory not loaded')
+            return None
+    
+    def center(self):
+        if self.traj is not None:
+            self.traj = self.traj.center_coordinates()
+            return self.traj
+        else:
+            print('Trajectory not loaded')
+            return None
 
     @staticmethod
     def now():
@@ -193,20 +231,33 @@ class Analysis:
                 break
         return partitions, nprocs
 
-    def toPDB(self, index, output, remark=None):
-        frame = self._traj._xyz[index]
+    def toPDB(self, index, output, full_traj=False, renumber=False, remark=None):
+        if full_traj:
+            frame = self._traj._xyz[index]
+        else:
+            frame = self.traj._xyz[index]
         chain_index = 0
         chain_id = 'A'
         contents = []
         if remark is not None:
             contents.append('{}\n'.format(remark))
         for z in range(0, len(frame)):
-            atom = self._traj.topology._atoms[z]
-            if atom.residue.chain.index > chain_index:
-                chain_index = atom.residue.chain.index
-                chain_id = chr(ord(chain_id) + 1)
+            if full_traj:
+                atom = self._traj.topology._atoms[z]
+            else:
+                atom = self.traj.topology._atoms[z]
+            if atom.residue.name in residues():
+                if atom.residue.chain.index > chain_index:
+                    chain_index = atom.residue.chain.index
+                    chain_id = chr(ord(chain_id) + 1)
+            else:
+                chain_id = ' '
+            if renumber:
+                res_num = str(atom.residue.index + 1)
+            else:
+                res_num = str(atom.residue.resSeq)
             x, y, z = map(self.fixCoordinates, frame[z])
-            line = ['ATOM', str(atom.index), atom.name, atom.residue.name, chain_id, str(atom.residue.resSeq), x, y, z, '1.00', '0.00', atom.element.symbol]
+            line = ['ATOM', str(atom.index), atom.name, atom.residue.name, chain_id, res_num, x, y, z, '1.00', '0.00', atom.element.symbol, atom.residue.segment_id]
             contents.append(line)
         writePDB(contents, output)
         print('Wrote {}'.format(output))

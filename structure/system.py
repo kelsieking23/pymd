@@ -37,7 +37,7 @@ class System:
     def __init__(self, protein, ligands=None, residues=None, covalent_ids=None, models=None, names=None, alt=None, ignh=False):
         self.protein = Protein(structure=protein, residues=residues, covalent_ids=covalent_ids)
         if residues is not None:
-            self.residues = residues
+            self.residues = [residue for residue in self.protein.residues if residue.id in residues]
         else:
             self.residues = self.protein.ids
         if isinstance(models, str):
@@ -192,10 +192,11 @@ class System:
         mindist = {}
         for ligand in self.ligands:
             mindist[ligand.name] = {}
-            for res_id in self.protein.ids:
+            for residue in self.protein.residues:
+                res_id = residue.id
                 mindist[ligand.name][res_id] = None
-                res_com = self.protein.coms[res_id]
-                for coord in ligand.coordinates:
+                res_com = residue.com
+                for coord in ligand.coordinates.values():
                     d = np.sqrt((coord[0] - res_com[0])**2 + (coord[1] - res_com[1])**2 + (coord[2] - res_com[2])**2)
                     if mindist[ligand.name][res_id] == None:
                         mindist[ligand.name][res_id] = d
@@ -235,6 +236,8 @@ class System:
                 mindist[residue.id]['ligand_atom'] = ligand_atom_name
             df = pd.DataFrame(mindist).T
             ligand.minimum_distance = df
+            yield df
+
 
     def averageDistance(self, to_csv=None):
         '''
@@ -342,7 +345,17 @@ class System:
             df.to_csv(to_csv)
         return df
 
-
+    def residueCOM_ligandAtomDist(self):
+        for ligand in self.ligands:
+            # ligand atom, ligand atom num, residue id, dist
+            data = []
+            for atom in ligand.atoms:
+                for residue in self.protein.residues:
+                    d = self.euclideanDistance(atom.coordinates, residue.com)
+                    data.append([atom.name, atom.number, residue.id, d])
+            df = pd.DataFrame(data, columns = ['atom', 'atom_number', 'res_id', 'dist'])
+            ligand.residue_com_dist = df
+            yield df
     ######################################################################################
     ################################# Vina Energy & LE ###################################
     ###################################################################################### 

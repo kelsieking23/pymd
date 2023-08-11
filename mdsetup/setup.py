@@ -3,7 +3,9 @@ import os
 import sys
 import shutil
 import subprocess
+import pandas as pd
 from pymd.mdsetup.mdsetup_dir import scriptdir
+from pymd.structure.protein import Protein
 # if sys.platform == 'win32':
 #     sys.path.append('D:/Work')
 #     import pymd
@@ -78,6 +80,7 @@ class Setup:
 
         directory = {}
         dirs = ['EM', 'build', 'NVT', 'NPT', 'MDrun']
+        print('building directories...')
         for _dir in dirs:
             # make EM, NVT, NPT, MDrun folders
             directory[_dir] = {}
@@ -141,12 +144,12 @@ class Setup:
             if filename == 'ions.mdp':
                 directory['mdps']['ions'] = os.path.join(mdp_dir, 'ions.mdp')
 
-        # fix force field for infer
-        if (self.cluster == 'infer') and (self.ff == 'charmm36-mar2019'):
-            charmmpath = os.path.join(scriptdir, 'ff', 'charmm36-mar2019.ff')
-            build_charmm = os.path.join(directory['build']['root'], 'charmm36-mar2019.ff')
-            if (not os.path.isdir(build_charmm)):
-                shutil.copytree(charmmpath, os.path.join(directory['build']['root'], 'charmm36-mar2019.ff'))
+        # # fix force field for infer
+        # if (self.cluster == 'infer') and (self.ff == 'charmm36-mar2019'):
+        #     charmmpath = os.path.join(scriptdir, 'ff', 'charmm36-mar2019.ff')
+        #     build_charmm = os.path.join(directory['build']['root'], 'charmm36-mar2019.ff')
+        #     if (not os.path.isdir(build_charmm)):
+        #         shutil.copytree(charmmpath, os.path.join(directory['build']['root'], 'charmm36-mar2019.ff'))
 
         return directory
 
@@ -167,7 +170,10 @@ class Setup:
         # header.append('# load modules, export library path, load gromacs\n')
         # header.append('export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/groups/bevanlab/software/cascades/fftw/3.3.8/lib:/groups/bevanlab/software/cascades/gromacs/2019.3/lib64 \n')
         header.append('export MODULEPATH=$MODULEPATH:{}\n'.format(self.modulepath))
-        header.append('module load gromacs-{}/{}\n\n'.format(self.partition.split('_')[0], self.version))
+        if self.cluster == 'infer':
+            header.append('module load gromacs-{}/{}\n\n'.format(self.partition.split('_')[0], self.version))
+        else:
+            header.append('module load gromacs/{}\n\n'.format(self.version))
         # for module in self.modules:
         #     if not module.startswith('source'):
         #         line = f'module load {module}\n'
@@ -191,10 +197,26 @@ class Setup:
         f.close()
         return len(chain_ids)
 
+    def run_cmd(self, cmd):
+        if not cmd.startswith('echo'):
+            process = subprocess.Popen(cmd.strip().split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif cmd.startswith('grep'):
+            process = subprocess.Popen(cmd.strip(), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            process = subprocess.Popen(cmd.strip(), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print('********************')
+        print(cmd.strip())
+        if cmd.startswith(self.mdrunPrefix):
+            print('Waiting...')
+            process.wait()
+        output, error = process.communicate()
+        print(output.decode())
+        print(error.decode())
+        return output, error
+    
     def build(self, structure, pname='NA', nname='CL', nterm=0, cterm = 0, run=True):
         cwd = os.getcwd()
-        os.chdir(self.directory['scripts'])
-
+        os.chdir(self.directory['build']['root'])
         filename = os.path.abspath(os.path.join(self.directory['scripts'], 'build.sh'))
         f = open(filename, 'w')
         header = self.getHeader(job_name='{}_build'.format(self.name), walltime='1:00:00', gpus=0)
@@ -207,9 +229,13 @@ class Setup:
         base = self.directory['build']['root']
         cmd = f'cd {self.buildpath}\n'
         f.write(cmd)
-        clean_pdb = os.path.join(base, 'clean.pdb')
-        cmd = 'grep -v HOH {} > {}\n'.format(_structure, clean_pdb)
-        f.write(cmd)
+        # clean_pdb = os.path.join(base, 'clean.pdb')
+        # cmd = 'grep -v HOH {} > {}\n'.format(_structure, clean_pdb)
+        # f.write(cmd)
+        # if (self.interactive) and (run):
+        #     print('Cleaning pdb...')
+        #     self.run_cmd(cmd)
+        #     print('Cleaning done')
         processed = os.path.join(base, 'processed.gro')
         if self.ff == 'charmm36-mar2019':
             water = 'tip3p'
@@ -220,47 +246,63 @@ class Setup:
         if self.ff == 'charmm36-mar2019':
             ff = 'charmm36-mar2019'
         chains = self.getNumberChains(_structure)
-        cmd = f'echo 3 4 | gmx pdb2gmx -ff {ff} -f {_structure} -o {processed} -ignh -water {water} -ter\n'
-        if chains > 1:
-            frag = cmd.split('|')[1]
-            frag = ' {} {} |'.format(nterm, cterm) + frag
-            for k in range(1, chains):
-                frag = ' {} {}'.format(nterm, cterm) + frag
-            cmd = 'echo' + frag
+        if (cterm > 0) or (nterm > 0):
+            cmd = f'echo {nterm} {cterm} | gmx pdb2gmx -ff {ff} -f {_structure} -o {processed} -ignh -water {water} -ter\n'
+            if chains > 1:
+                frag = cmd.split('|')[1]
+                frag = ' {} {} |'.format(nterm, cterm) + frag
+                for k in range(1, chains):
+                    frag = ' {} {}'.format(nterm, cterm) + frag
+                cmd = 'echo' + frag
+        else:
+            cmd = f'gmx pdb2gmx -ff {ff} -f {_structure} -o {processed} -ignh -water {water}\n'
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('doing pdb2gmx...')
+            self.run_cmd(cmd)
+            print('pdb2gmx done')
         newbox = os.path.join(base, 'box.gro')
         cmd = 'gmx editconf -f {} -o {} -c -d 1.0 -bt cubic\n'.format(processed, newbox)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('doing editconf...')
+            self.run_cmd(cmd)
+            print('editconf done')
         solv = os.path.join(base, 'solv.gro')
         cmd = 'gmx solvate -cp {} -cs spc216.gro -o {} -p {}\n'.format(newbox, solv, topol)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('solvating...')
+            self.run_cmd(cmd)
+            print('solvation done')
         ions_tpr = os.path.join(base, 'ions.tpr')
         cmd = 'gmx grompp -f {} -c {} -p {} -o {}\n'.format(self.directory['mdps']['ions'], solv, topol, ions_tpr)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('running grompp for ions...')
+            self.run_cmd(cmd)
+            print('grompp done')
         solv_ions = os.path.join(base,'ions.gro')
         cmd = 'echo 13 | gmx genion -s {} -o {} -p {} -pname {} -nname {} -conc 0.150 -neutral\n'.format(ions_tpr, solv_ions, topol, pname, nname)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('doing genion...')
+            self.run_cmd(cmd)
+            print('running genion done')
         f.close()
         if run is True:
             if not self.interactive:
-
+                os.chdir(self.directory['scripts'])
                 process = subprocess.Popen('sbatch {}'.format(filename).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
-                output, error = process.communicate()
-                print(output.decode())
-                print(error.decode())
-            else:
-                process = subprocess.Popen('chmod u+x build.sh'.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process = subprocess.Popen('./build.sh'.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 process.wait()
                 output, error = process.communicate()
                 print(output.decode())
                 print(error.decode())
         os.chdir(cwd)
 
-    def em(self, gpu=1, run=True):
+    def em(self, gpu=1, maxwarn=0, run=True):
         cwd = os.getcwd()
-        os.chdir(self.directory['scripts'])
+        # os.chdir(self.directory['scripts'])
         # get header
         header = self.getHeader(job_name='{}_em'.format(self.name), walltime='10:00:00', ntasks_per_node=12, gpus=gpu)
         filename = os.path.abspath(os.path.join(self.directory['scripts'], 'em.sh'))
@@ -271,11 +313,17 @@ class Setup:
 
         cmd = 'cd {}\n\n'.format(self.directory['EM']['root'])
         f.write(cmd)
+        os.chdir(self.directory['EM']['root'])
+        
         solv_ions = os.path.join(self.buildpath,'ions.gro')
         topol = os.path.join(self.buildpath, 'topol.top')
         self.directory['EM']['tpr'] = os.path.join(self.directory['EM']['root'], 'em.tpr')
-        cmd = 'gmx grompp -f {} -c {} -p {} -o {}'.format(self.directory['mdps']['em'], solv_ions, topol, 'em.tpr')
+        cmd = 'gmx grompp -f {} -c {} -p {} -o {} -maxwarn {}'.format(self.directory['mdps']['em'], solv_ions, topol, 'em.tpr', maxwarn)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('Running grompp...')
+            self.run_cmd(cmd)
+            print('grompp done')
         f.write('\n\n')
         if gpu > 0:
             prefix = self.mdrunPrefix
@@ -284,6 +332,10 @@ class Setup:
             prefix = 'gmx mdrun'
             cmd = '{} -s {} -mp {} -v -deffnm em'.format(prefix, self.directory['EM']['tpr'], topol)
         f.write(cmd)
+        if (self.interactive) and (run):
+            print('Running EM...')
+            self.run_cmd(cmd)
+            print('EM complete')
         f.write('\n\n')
         f.write('wait\n\n')
         f.write('\n\n')
@@ -292,21 +344,12 @@ class Setup:
         if run is True:
             if not self.interactive:
                 process = subprocess.Popen('sbatch {}'.format(filename).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
-                output, error = process.communicate()
-                print(output.decode())
-                print(error.decode())
-            else:
-                process = subprocess.Popen('chmod u+x em.sh'.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
-                process = subprocess.Popen('./em.sh'.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
                 output, error = process.communicate()
                 print(output.decode())
                 print(error.decode())
         os.chdir(cwd)
         
-    def nvt(self, run=True, nodes=1, ntasks_per_node=12, gpu=1):
+    def nvt(self, run=True, nodes=1, ntasks_per_node=12, gpu=1, maxwarn=0):
         cwd = os.getcwd()
         os.chdir(self.directory['scripts'])
         scripts = []
@@ -319,39 +362,40 @@ class Setup:
                 f.write(line)
             f.write('\n\n')
             cmd = 'cd ../NVT/{}\n'.format(rep)
+            os.chdir(os.path.join(self.directory['NVT']['root'], 'rep{}'.format(rep)))
             f.write(cmd)
             em_gro = os.path.join(self.directory['EM']['root'], 'em.gro')
             # nvt_tpr = os.path.join(self.directory['NVT']['root'], str(rep), 'nvt.tpr')
             topol = os.path.join(self.buildpath, 'topol.top')
             nvt_tpr = 'nvt.tpr'
-            cmd = 'gmx grompp -f {} -c {} -r {} -p {} -o {}\n'.format(self.directory['mdps']['nvt'], em_gro, em_gro, topol, nvt_tpr)
+            cmd = 'gmx grompp -f {} -c {} -r {} -p {} -o {} -maxwarn {}\n'.format(self.directory['mdps']['nvt'], em_gro, em_gro, topol, nvt_tpr, maxwarn)
             f.write(cmd)
-            cmd = '{} -gpu_id {} -nt {} -deffnm nvt -v\n\n'.format(self.mdrunPrefix, str(gpu_id), ntasks_per_node)
+            if (self.interactive) and (run):
+                print('Running grompp for NVT, rep{}...'.format(rep))
+                self.run_cmd(cmd)
+                print('Grompp done')
+            cmd = '{} -gpu_id {} -nt {} -deffnm nvt\n\n'.format(self.mdrunPrefix, str(gpu_id), ntasks_per_node)
             f.write(cmd)
+            if (self.interactive) and (run):
+                print('Running NVT, rep{}...'.format(rep))
+                self.run_cmd(cmd)
+                print('NVT for rep{} done'.format(rep))
             f.write('wait\n\n')
             cmd = 'cd {}\n'.format(self.directory['scripts'])
             f.write(cmd)
             f.close()
             scripts.append(os.path.basename(filename))
         if run is True:
-            for script in scripts:
-                if self.interactive:
-                    process = subprocess.Popen('chmod u+x {}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    process = subprocess.Popen('./{}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    process.wait()
-                    output, error = process.communicate()
-                    print(output.decode())
-                    print(error.decode())
-                else:
+            if not self.interactive:
+                for script in scripts:
                     process = subprocess.Popen('sbatch {}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     process.wait()
                     output, error = process.communicate()
                     print(output.decode())
                     print(error.decode())
-                    
         return filename
 
-    def npt(self, nodes=1, ntasks_per_node=12, gpu=1, run=True):
+    def npt(self, nodes=1, ntasks_per_node=12, gpu=1, maxwarn=0, run=True):
         cwd = os.getcwd()
         os.chdir(self.directory['scripts'])
         scripts = []
@@ -364,29 +408,31 @@ class Setup:
             f.write('\n\n')
             cmd = 'cd ../NPT/{}/\n'.format(str(rep))
             f.write(cmd)
-            nvt_gro = os.path.join(self.directory['NVT']['root'], str(rep), 'nvt.gro')
+            os.chdir(os.path.join(self.directory['NPT']['root'], f'rep{str(rep)}'))
+            nvt_gro = os.path.join(self.directory['NVT']['root'], f'rep{str(rep)}', 'nvt.gro')
             npt_tpr = 'npt.tpr'
             topol = os.path.join(self.buildpath, 'topol.top')
-            cmd = 'gmx grompp -f {} -c {} -r {} -p {} -o {}\n'.format(self.directory['mdps']['npt'], nvt_gro, nvt_gro, topol, npt_tpr)
+            cmd = 'gmx grompp -f {} -c {} -r {} -p {} -o {} -maxwarn {}\n'.format(self.directory['mdps']['npt'], nvt_gro, nvt_gro, topol, npt_tpr, maxwarn)
             f.write(cmd)
-            cmd = '{} -gpu_id {} -nt {} -deffnm npt -v\n\n'.format(self.mdrunPrefix, str(0), ntasks_per_node)
+            if (self.interactive) and (run):
+                print('Running grompp for NPT, rep{}...'.format(rep))
+                self.run_cmd(cmd)
+                print('Grompp done')
+            cmd = '{} -gpu_id {} -nt {} -deffnm npt\n\n'.format(self.mdrunPrefix, str(0), ntasks_per_node)
             f.write(cmd)
-            f.write('wait\n\n')
+            if (self.interactive) and (run):
+                print('Running NPT, rep{}...'.format(rep))
+                self.run_cmd(cmd)
+                print('NPT for rep{} done'.format(rep))
             cmd = 'cd {}\n'.format(self.directory['scripts'])
             f.write(cmd)
             f.close()
             scripts.append(os.path.basename(filename))
         if run is True:
             for script in scripts:
-                if self.interactive:
+                if not self.interactive:
                     process = subprocess.Popen('chmod u+x {}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     process = subprocess.Popen('./{}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    process.wait()
-                    output, error = process.communicate()
-                    print(output.decode())
-                    print(error.decode())
-                else:
-                    process = subprocess.Popen('sbatch {}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     process.wait()
                     output, error = process.communicate()
                     print(output.decode())
@@ -394,7 +440,9 @@ class Setup:
         return filename
     
     def production(self, nodes=1, ntasks_per_node=12, gpu=1, run=False, start=0, length=1000, interval=100, walltime='45:00:00', auto_submit=False):
+        cwd = os.getcwd()
         scripts = []
+        mdrun_directories = []
         os.chdir(self.directory['scripts'])
         # edit MDP to run for the specified interval
         steps = self.nsToSteps(ns=interval)
@@ -407,23 +455,27 @@ class Setup:
                 start = i
                 stop = i + interval
                 steps = self.nsToSteps(ns=stop)
-                filename = os.path.join('md_{}_{}_{}.sh'.format(rep, start, stop))
+                filename = os.path.join(self.directory['MDrun']['root'], 'rep{}'.format(rep), 'production_{}_{}.sh'.format(start, stop))
                 f = open(filename, 'w')
-                header = self.getHeader(job_name='{}{}_md_{}_{}'.format(self.name, rep, start, stop),nodes=nodes, ntasks_per_node=ntasks_per_node, walltime=walltime, gpus=gpu)
+                header = self.getHeader(job_name='{}{}_{}_{}'.format(self.name, rep, start, stop),nodes=nodes, ntasks_per_node=ntasks_per_node, walltime=walltime, gpus=gpu)
                 for line in header:
                     f.write(line)
                 f.write('\n\n')
-                cmd = 'cd ../MDrun/{}/\n'.format(str(rep))
-                f.write(cmd)
                 mdp = self.directory['mdps']['md']
                 topol = os.path.join(self.buildpath, 'topol.top')
-                md_tpr = 'md_{}_{}.tpr'.format(start, stop)
-                deffnm = 'md_{}_{}'.format(start, stop)
+                md_tpr = 'md.{}.{}.tpr'.format(start, stop)
+                deffnm = 'md.{}.{}'.format(start, stop)
+                current_interval = '{}_{}ns'.format(start, stop)
+                cmd = f'mkdir {current_interval}\n'
+                f.write(cmd)
+                cmd = f'cd {current_interval}\n'
+                f.write(cmd)
                 if i == sim_start:
-                    cr = os.path.join(self.directory['NPT']['root'], str(rep), 'npt.gro')
-                    cpt = os.path.join(self.directory['NPT']['root'], str(rep), 'npt.cpt')
+                    cr = os.path.join(self.directory['NPT']['root'], f'rep{str(rep)}', 'npt.gro')
+                    cpt = os.path.join(self.directory['NPT']['root'], f'rep{str(rep)}', 'npt.cpt')
                     cmd = f'gmx grompp -f {mdp} -c {cr} -r {cr} -t {cpt} -p {topol} -o {md_tpr} \n'
                     f.write(cmd)
+                    f.write('\n')
                     cmd = f'{self.mdrunPrefix} -deffnm {deffnm} -nt {ntasks_per_node} -gpu_id 0 \n'
                     f.write(cmd)
                 else:
@@ -432,18 +484,14 @@ class Setup:
                     cmd = f'{self.mdrunPrefix} -deffnm {deffnm} -nt {ntasks_per_node} -gpu_id 0 -cpi {last_cpi} -noappend\n'
                     f.write(cmd)
                 f.write('\nwait\n\n')
-                current_interval = '{}_{}ns'.format(start, stop)
                 runs.append(current_interval)
-                cmd = f'mkdir {current_interval}\n'
-                f.write(cmd)
-                cmd = f'mv {deffnm}* {current_interval}{os.sep}\n\n'
-                f.write(cmd)
                 if auto_submit:
                     if (stop + interval) <= length:
                         cmd = 'cd {}\n'.format(self.directory['scripts'])
                         f.write(cmd)
-                        cmd = 'sbatch md_{}_{}_{}.sh \n\nexit;'.format(rep, start+interval, stop+interval)
+                        cmd = 'sbatch {}\n'.format(filename)
                         f.write(cmd)
+                        f.write('\nexit;\n')
                 f.close()
                 last_tpr = os.path.join(current_interval, md_tpr)
                 if part > 1:
@@ -454,11 +502,17 @@ class Setup:
                 part += 1
                 if i == sim_start:
                     scripts.append(filename)
+                    mdrun_directories.append(os.path.join(self.directory['MDrun']['root'], 'rep{}'.format(rep)))
 
         if run is True:
-            for script in scripts:
+            for script, mdrun_directory in zip(scripts, mdrun_directories):
+                os.chdir(mdrun_directory)
                 process = subprocess.Popen('sbatch {}'.format(script).split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
+                output, error = process.communicate()
+                print(output.decode())
+                print(error.decode())
+        os.chdir(cwd)
+
 
     def editMDP(self, steps):
         f = open(self.directory['mdps']['md'], 'r')
@@ -486,7 +540,40 @@ class Setup:
         if (ns is None) and (steps is None):
             return None
     
+    @staticmethod 
+    def minmax(_min, _max, val):
+        _realmin = _min
+        _realmax = _max
+        if val < _min:
+            _realmin = _min
+        if val > _max:
+            _realmax = _max
+        return _realmin, _realmax
+    
+    @staticmethod
+    def calcBoxSize(structure, unit='angstrom', decimals=5, edge_distance=10):
+        protein = Protein(structure)
+        coords = []
+        for atom in protein.atoms:
+            coords.append(atom.coordinates)
+        df = pd.DataFrame(coords, columns=['x', 'y', 'z'])
+        print(df)
+        dx = (df['x'].max() + edge_distance) - (df['x'].min() - edge_distance) 
+        dy = (df['y'].max() + edge_distance) - (df['y'].min() - edge_distance)
+        dz = (df['z'].max() + edge_distance) - (df['z'].min() - edge_distance) 
+        if unit == 'angstrom':
+            dx = dx / 10
+            dy = dy / 10
+            dz = dz / 10
+        return round(dx, decimals), round(dy, decimals), round(dz, decimals)
+        
 
+
+
+            
+
+pdb = 'D:/Work/Projects/amyloidNSF/membrane/ab_control/decamer/deca_v1.pdb'
+print(Setup.calcBoxSize(pdb, unit='nm'))
 # ast = Setup('/work/cascades/kelsieking23/fetub/asticin', reps=4, name='ast')
 # ast.em('model1.pdb')
 # wt = Setup('/work/cascades/kelsieking23/fetub/wt', reps=4, name='wt', home='/home/kelsieking23/software')
