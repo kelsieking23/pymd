@@ -29,6 +29,7 @@ class DSSP(Analysis):
         self.parent = parent
         self.df = pd.DataFrame()
         self.block_average = block_average
+        self.verbose = True
         self.__dict__.update(kwargs)
         self.test = 0
     

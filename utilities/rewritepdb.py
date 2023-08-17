@@ -130,7 +130,7 @@ def renumberPDB(filename, newfilename, nterm, cterm):
                     num = nterm
             else:
                 parts = contents[i+1].split() # check next atom
-                if 'TER' not in parts: # check if next atom is atom
+                if parts[0].startswith('ATOM'): # check if next atom is atom
                     next_resnum = parts[5] # hold next residue number
                 # format the new line with appropriate residue number, append to newcontents
                 if len(line_parts[2]) < 4: 

@@ -43,7 +43,10 @@ class Analysis:
 
     @property
     def top(self):
-        return mdtraj.load(self.topfile).topology
+        if self.traj is None:
+            return mdtraj.load(self.topfile).topology
+        else:
+            return self.traj.topology
 
     def save(self):
         params = {}
