@@ -38,3 +38,29 @@ def dna():
 
 def lipid():
      return ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC']
+
+def code_conversions():
+    d = {
+         'ala':'a',
+         'arg':'r',
+         'asn':'n',
+         'asp':'d',
+         'cys':'c',
+         'glu':'e',
+         'gln':'q',
+         'gly':'g',
+         'his':'h',
+         'hsd':'h',
+         'ile':'i',
+         'leu':'l',
+         'lys':'k',
+         'met':'m',
+         'phe':'f',
+         'pro':'p',
+         'ser':'s',
+         'thr':'t',
+         'trp':'w',
+         'tyr':'y',
+         'val':'v'
+    }
+    return d

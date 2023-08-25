@@ -129,6 +129,8 @@ class Plotter:
                 if pdata.saveto.endswith('svg'):
                     plt.savefig(pdata.saveto, dpi=300)
                 print('Plotted {}'.format(pdata.saveto))
+                if show is True:
+                    plt.show()
                 plt.close()
             elif show is False:
                 pass

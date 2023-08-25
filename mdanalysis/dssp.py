@@ -52,8 +52,11 @@ class DSSP(Analysis):
         self.df = df
         
         if self.output is not None:
-            self.writeXVG(method='time')
-            df = PostProcess.metadata(self.output, df=self.df)
+            if self.output.endswith('xvg'):
+                self.writeXVG(method='time')
+                df = PostProcess.metadata(self.output, df=self.df)
+            else:
+                df.to_csv(self.output)
         self.df = df
         # self.parent.df = self.df
         self.save()
