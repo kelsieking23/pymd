@@ -1,5 +1,5 @@
 from pymd.utilities.rewritepdb import writePDB, editChainIDResidue
-import MDAnalysis as mda
+# import MDAnalysis as mda
 
 def convertCoordinates(coordinates):
     xyz = list(map(float, coordinates))
@@ -11,12 +11,12 @@ def convertCoordinates(coordinates):
         transformed.append(c)
     return transformed
     
-def convertGro(structure):
-    universe = mda.Universe(structure)
-    newfilename = structure[:-3] + 'pdb'
-    with mda.Writer(newfilename) as pdb:
-        pdb.write(universe)
-    return newfilename
+# def convertGro(structure):
+#     universe = mda.Universe(structure)
+#     newfilename = structure[:-3] + 'pdb'
+#     with mda.Writer(newfilename) as pdb:
+#         pdb.write(universe)
+#     return newfilename
 def convertGroOld(structure, ligands=None):
     valid_residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD',
                 'ACE', 'NH2', 'NME']
