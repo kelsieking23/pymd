@@ -48,7 +48,7 @@ class Analysis:
         else:
             return self.traj.topology
 
-    def save(self):
+    def save(self, **kwargs):
         params = {}
         manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']
         to_dump = {}
@@ -58,6 +58,8 @@ class Analysis:
                 to_dump[key] = value
             except:
                 continue
+        for k, v in kwargs.items():
+            to_dump[k] = v
         filename = os.path.join(self.root, 'job_params.json')
         with open(filename, 'w') as f:
             params_dict = json.dumps(to_dump)
@@ -200,6 +202,9 @@ class Analysis:
             print('Trajectory not loaded')
             return None
 
+    def select(self, selection):
+        return self.top.select(selection)
+    
     @staticmethod
     def now():
         return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
