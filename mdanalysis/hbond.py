@@ -53,7 +53,7 @@ class Hbond(Analysis):
             raise ValueError('No trajectory loaded! Load with hbond.loadTrajectory()')
         if self.verbose:
             print('Writing job data...')
-        self.save()
+        self.save(selection=selection, method=method, freq_step=freq_step)
         if self.verbose:
             print('Job Data Written')
             print('Method: {}'.format(method))
@@ -87,10 +87,13 @@ class Hbond(Analysis):
     def runBakerHubbard(self, freq_step, selection, **kwargs):
         top_atoms = self.select(selection)
         hbond_data = []
+        base, ext = tuple(os.path.splitext(self.output))
         freqs = np.arange(freq_step, 1+freq_step, freq_step)
         percents = np.arange(0.1, 1.1, 0.1)
         for i, freq in enumerate(freqs):
             hbond = self.bakerHubbard(freq, **kwargs)
+            hbond_pairs_output = base + '.pairs_freq{}.{}'.format(freq, ext)
+            pd.DataFrame(hbond).to_csv(hbond_pairs_output)
             data = self.getBlankMatrix(top_atoms)
             for bond in hbond:
                 d = bond[0]
@@ -102,6 +105,7 @@ class Hbond(Analysis):
                     data[ares][dres] = freq
             hbond_data.append(pd.DataFrame(data))
             if self.verbose:
+                print('({}/{}) complete'.format(i+1, len(freqs)))
                 percent = i/len(freqs)
                 if percent in percents:
                     print('{:.0f}% complete...'.format(percent*100))

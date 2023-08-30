@@ -118,7 +118,7 @@ class Analysis:
     def output(self):
         if self._output is not None:
             return os.path.join(self.root, self._output) # type: ignore
-        return None
+        return os.path.join(self.root, 'analysis.csv')
         # if self.parent is not None:
         #     if not os.path.isdir(os.path.join(self.parent.root, self.job_name)): # type: ignore
         #         os.mkdir(os.path.join(self.parent.root, self.job_name)) # type: ignore
