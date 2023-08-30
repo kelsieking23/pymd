@@ -9,19 +9,21 @@ import os
 import sys
 import argparse
 from argparse import RawTextHelpFormatter
+# from pymd.structure.topology import Topology
 
 class Ndx:
 
     def __init__(self, gro, peptides=1, ndxt=None, ligands=None):
         self.gro = gro
-        self.peptides= peptides
+        # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
-        types = self.getTypes(self.ndxt_groups, ligands)
-        self.types = {}
-        for key in types.keys():
-            self.types[key] = Type(key, types[key])
+        self.types = self.getTypes(self.ndxt_groups, ligands)
+        # self.topology = Topology(gro)
+        # self.types = {}
+        # for key in types.keys():
+        #     self.types[key] = Type(key, types[key])
         self.selections = {}
 
     @property
@@ -87,6 +89,56 @@ class Ndx:
             self.selections[selection] = self.interpret(selection)
             return self.interpret(selection)
 
+    def peptides(self):
+        indeces = {}
+        peptide_keys = []
+        for key in self.types:
+            if key.startswith('p'):
+                if len(key) == 1:
+                    continue
+                if key[1].isnumeric():
+                    indeces[key] = self.types[key]
+                    peptide_keys.append(key)
+        backbone = self.types['backbone']
+        for key in peptide_keys:
+            indeces['{}_&_backbone'.format(key)] = [atom for atom in indeces[key] if atom in backbone]
+        sidechain = self.types['sidechain']
+        for key in peptide_keys:
+            indeces['{}_&_sidechain'.format(key)] = [atom for atom in indeces[key] if atom in sidechain]
+        mainchain = self.types['mainchain']
+        for key in peptide_keys:
+            indeces['{}_&_mainchain'.format(key)] = [atom for atom in indeces[key] if atom in mainchain]
+        return indeces
+
+    def by_residue(self):
+        indeces = {}
+        peptide_keys = []
+        for key in self.types:
+            if key.startswith('ri'):
+                if len(key) == 1:
+                    continue
+                if key[2].isnumeric():
+                    indeces[key] = self.types[key]
+                    peptide_keys.append(key)
+        protein = self.types['protein']
+        backbone = self.types['backbone']
+        sidechain = self.types['sidechain']
+        mainchain = self.types['mainchain']
+        restypes = {
+            'protein':protein,
+            'backbone':backbone,
+            'sidechain':sidechain,
+            'mainchain':mainchain
+        }
+        for restype, lst in restypes.items():
+            print(restype)
+            _indeces = {}
+            for ri in indeces.keys():
+                _indeces['{}_&_{}'.format(ri, restype)] = [atom for atom in indeces[ri] if atom in lst]
+            yield restype, _indeces
+
+
+
 
     def parseSelection(self, sele):
         parsed = []
@@ -131,24 +183,24 @@ class Ndx:
         if '(' in sele:
             sele_string = ''
             subgroups = self.parse_parentheses(sele)
-            print(subgroups)
+            # print(subgroups)
             for grp in subgroups:
                 if isinstance(grp, list):
                     _sele_string = ''.join(grp)
-                    print(_sele_string)
+                    # print(_sele_string)
                     atoms = self.interpret(_sele_string)
                     type_string = sele_in.split()[i]
-                    print(type_string)
+                    # print(type_string)
                     self.types[type_string] = Type(type_string, atoms)
                     sele_string += type_string
-                    print(sele_string)
+                    # print(sele_string)
                     # parsed.append(_sele_string)
 
                 else:
                     sele_string += grp
             parsed.append(sele_string)
         i += 1
-        print(parsed)
+        # print(parsed)
         if parsed == []:
             return sele
         return parsed[0]
@@ -209,7 +261,7 @@ class Ndx:
         return atoms
     
     def getAtoms(self, sele):
-        return self.types[sele].items
+        return self.types[sele]
 
     def mapRI(self):
         i = 0
@@ -261,12 +313,13 @@ class Ndx:
         residues = [item.lower() for item in residues]
         caps = ['ace', 'nh2']
         lipids = ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC']
+        gangliosides = ['cer', 'bglc', 'bgal', 'ane5']
         lipids = [item.lower() for item in lipids]
         backbone = ['ca', 'c', 'n']
-        mainchain = ['ca', 'c', 'o', 'n', 'hn', 'h', 'ha']
+        mainchain = ['ca', 'c', 'o', 'n', 'hn', 'h', 'ha', 'h1', 'h2', 'h3', 'o1', 'o2']
         ions = ['k', 'cl', 'na', 'sod', 'cla']
         solvent = ['sol', 'tip3p']
-        headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11', 'p']
+        headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11']
         types = {
             'system':[],
             'protein':[],
@@ -284,6 +337,7 @@ class Ndx:
             'ions':[],
             'solvent':[],
             'lipids':[],
+            'gangliosides':[],
             'drude_particles':[],
             'o':[],
             'n':[],
@@ -353,6 +407,23 @@ class Ndx:
                 else:
                     pass
                 types['system'].append(atom_num)
+                # atom types
+                if 'o' in atom_name:
+                    types['o'].append(atom_num)
+                if 'n' in atom_name:
+                    types['n'].append(atom_num)
+                if 'h' in atom_name:
+                    types['h'].append(atom_num)
+                if 'c' in atom_name:
+                    types['c'].append(atom_num)
+                if 'p' in atom_name:
+                    types['p'].append(atom_num)
+                if 's' in atom_name:
+                    types['s'].append(atom_num)
+                if atom_name not in types.keys():
+                    types[atom_name] = [atom_num]
+                else:
+                    types[atom_name].append(atom_num)
                 if res_name in residues:
                     # protein atoms
                     types['protein'].append(atom_num)
@@ -374,32 +445,14 @@ class Ndx:
                     if atom_name in backbone:
                         types['backbone'].append(atom_num)
                         types['backbone_nocaps'].append(atom_num)
-                    # mainchain
-                    elif atom_name in mainchain:
+                    if atom_name in mainchain:
                         types['mainchain'].append(atom_num)
                         types['mainchain_nocaps'].append(atom_num)
                         types['mainchain_h'].append(atom_num)
                         types['mainchain_h_nocaps'].append(atom_num)
-                    else:
+                    if (atom_name not in mainchain) and (atom_name not in backbone):
                         types['sidechain'].append(atom_num)
 
-                    # atom types
-                    if 'o' in atom_name:
-                        types['o'].append(atom_num)
-                    if 'n' in atom_name:
-                        types['n'].append(atom_num)
-                    if 'h' in atom_name:
-                        types['h'].append(atom_num)
-                    if 'c' in atom_name:
-                        types['c'].append(atom_num)
-                    if 'p' in atom_name:
-                        types['p'].append(atom_num)
-                    if 's' in atom_name:
-                        types['s'].append(atom_num)
-                    if atom_name not in types.keys():
-                        types[atom_name] = [atom_num]
-                    else:
-                        types[atom_name].append(atom_num)
                     # res id 
                     if res_id not in list(types.keys()):
                         types[res_id] = []
@@ -457,6 +510,7 @@ class Ndx:
                         visited_residues.append(res_id)
                     last_res_id = res_id
                     last_res_num = res_num
+
                 # caps
                 elif res_name in caps:
                     types['protein_caps'].append(atom_num)
@@ -479,15 +533,19 @@ class Ndx:
                         types[res_name] = [atom_num]
                     else:
                         types[res_name].append(atom_num)
-                    types['nonprotein'].append(atom_num)
+                # ganglioside
+                elif res_name in gangliosides:
+                    types['gangliosides'].append(atom_num)
+                    if res_name not in types.keys():
+                        types[res_name] = [atom_num]
+                    else:
+                        types[res_name].append(atom_num)
                 # ions
                 elif res_name in ions:
                     types['ions'].append(atom_num)
-                    types['nonprotein'].append(atom_num)
                 # solvent
                 elif res_name in solvent:
                     types['solvent'].append(atom_num)
-                    types['nonprotein'].append(atom_num)
                     # break
                 # ligands
                 elif res_name in ligands:
@@ -497,7 +555,6 @@ class Ndx:
                         types[res_id].append(atom_num)
                     else:
                         types[res_id].append(atom_num)
-                    types['nonprotein'].append(atom_num)
                 # other non protein
                 else:
                     types['nonprotein'].append(atom_num)
@@ -661,15 +718,15 @@ Selection Examples:
     parser.add_argument('gro', type=str, help='[.gro/ .pdb/ .pdbqt] (required)\n  Structure file')
     parser.add_argument('-r', '--residue', help='Create files with residues as individaul index groups', action='store_true')
 
-    parser.add_argument('-p', '--peptides', help='Create files with peptides/chains as individual index grups')
+    parser.add_argument('-p', '--peptide', help='Create files with peptides/chains as individual index grups', action='store_true')
     parser.add_argument('-selections', nargs='+', type=str, help='  Selection string(s). Each individual selection must be enclosed in quotations. Run with option --show-examples to see demonstrations.')
     parser.add_argument('-ligands', nargs='*', type=str, help="  Residue names for ligand(s) or other non-standard residues in the structure file, if any. If not specified and non-residue ligands are present, will be grouped under 'non protein'")
-    # parser.add_argument('-o', '--output', nargs='?', default='index.ndx', help='[.ndx] (default: index.ndx)\n  Output index file')
-    # parser.add_argument('--show-examples', action='store_true', help='Show examples and quit')
+    parser.add_argument('-o', '--output', nargs='?', default='index.ndx', help='[.ndx] (default: index.ndx)\n  Output index file')
+    parser.add_argument('--show-examples', action='store_true', help='Show examples and quit')
 
-    # if '--show-examples' in sys.argv:
-    #     print(epilog)
-    #     sys.exit(0)
+    if '--show-examples' in sys.argv:
+        print(epilog)
+        sys.exit(0)
     # show help if ran with no arguments
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -684,8 +741,9 @@ def errorHandler(parser, args):
         parser.print_help()
         raise FileNotFoundError('Input file {} either does not exist or is not accessible'.format(args.gro))
     if args.selections is None:
-        parser.print_help()
-        raise ValueError('No selections specified. See help (python ndx.py -h)')
+        if (not args.peptide) and (not args.residue):
+            parser.print_help()
+            raise ValueError('No selections specified. See help (python ndx.py -h)')
     fileChoicesOutput(args.output, parser)
     fileChoicesInput(args.gro, parser)
 
@@ -693,14 +751,28 @@ def errorHandler(parser, args):
 def main():
     # get & check args
     args = commandline()
+    # print(args.output)
     # make ndx
     n = Ndx(args.gro, ligands=args.ligands)
-    for selection in args.selections:
-        selection = n.select(selection.lower())
-    # n.makeNDX(args.output)
+    indeces = {}
+    if args.peptide:
+        indeces = n.peptides()
+    if args.selections is not None:
+        for selection in args.selections:
+            sele = n.select(selection.lower())
+            indeces[selection] = sele
+    if args.residue:
+        for restype, indeces in n.by_residue():
+            if args.selections is not None:
+                for selection in args.selections:
+                    sele = n.select(selection.lower())
+                    indeces[selection] = sele
+            fname = os.path.join(os.path.dirname(os.path.abspath(args.output)), '{}.{}'.format(restype, os.path.basename(args.output)))
+            n.makeNDX(fname, indeces)
+            print('Wrote {}'.format(fname))
+    fname = os.path.join(os.path.dirname(os.path.abspath(args.output)), os.path.basename(args.output))
+    n.makeNDX(fname, indeces)
+    print('Wrote {}'.format(fname))
 
 if __name__ == '__main__':
     main()
-
-
-        

@@ -45,7 +45,7 @@ class Hbond(Analysis):
         self.verbose = False
         self.__dict__.update(kwargs)
 
-    def run(self, freq_step=0.01, method='baker-hubbard', selection='all', output='hbond.csv', **kwargs):
+    def run(self, selection, freq_step=0.01, method='baker-hubbard', output='hbond.csv', **kwargs):
         self._output = output
         try:
             assert self.traj is not None
@@ -53,7 +53,13 @@ class Hbond(Analysis):
             raise ValueError('No trajectory loaded! Load with hbond.loadTrajectory()')
         if self.verbose:
             print('Writing job data...')
-        self.save(selection=selection, method=method, freq_step=freq_step)
+        if isinstance(selection, str):
+            selection_tosave = selection
+        elif isinstance(selection, (list, tuple, np.ndarray,)):
+            selection_tosave = '[list of length {}]'.format(len(selection))
+        else:
+            raise ValueError('Selection must be a string (mdtraj selection string) or array-like. Selection was {}'.format(selection))
+        self.save(selection=selection_tosave, method=method, freq_step=freq_step)
         if self.verbose:
             print('Job Data Written')
             print('Method: {}'.format(method))
@@ -75,7 +81,7 @@ class Hbond(Analysis):
             if res_id not in res_ids:
                 res_ids.append(res_id)
         for atom in top_atoms:
-            res_id = self.top.atom(atom).residue.name + str(self.top.atom(atom).residue.name)
+            res_id = self.top.atom(atom).residue.name + str(self.top.atom(atom).residue.resSeq)
             if res_id not in res_ids:
                 res_ids.append(res_id)
         for res_id in res_ids:
@@ -85,14 +91,21 @@ class Hbond(Analysis):
         return m
     
     def runBakerHubbard(self, freq_step, selection, **kwargs):
-        top_atoms = self.select(selection)
+        if isinstance(selection, str):
+            top_atoms = self.select(selection)
+        elif isinstance(selection, (list, tuple, np.ndarray,)):
+            top_atoms = selection
+        else:
+            raise ValueError('Selection must be a string (mdtraj selection string) or array-like. Selection was {}'.format(selection))
         hbond_data = []
         base, ext = tuple(os.path.splitext(self.output))
         freqs = np.arange(freq_step, 1+freq_step, freq_step)
         percents = np.arange(0.1, 1.1, 0.1)
         for i, freq in enumerate(freqs):
+            if freq > 1:
+                break
             hbond = self.bakerHubbard(freq, **kwargs)
-            hbond_pairs_output = base + '.pairs_freq{}.{}'.format(freq, ext)
+            hbond_pairs_output = base + '.pairs_freq{:1.2f}{}'.format(freq, ext)
             pd.DataFrame(hbond).to_csv(hbond_pairs_output)
             data = self.getBlankMatrix(top_atoms)
             for bond in hbond:
@@ -103,7 +116,9 @@ class Hbond(Analysis):
                     ares = self.top.atom(a).residue.name + str(self.top.atom(a).residue.resSeq)
                     data[dres][ares] = freq
                     data[ares][dres] = freq
-            hbond_data.append(pd.DataFrame(data))
+            hbond_data.append(pd.DataFrame(data).astype(float))
+            hb_data_output = base + '.matrix_freq{:1.2f}{}'.format(freq, ext)
+            hbond_data[-1].to_csv(hb_data_output)
             if self.verbose:
                 print('({}/{}) complete'.format(i+1, len(freqs)))
                 percent = i/len(freqs)
@@ -112,7 +127,8 @@ class Hbond(Analysis):
         if self.verbose:
             print('100% complete.')
             print('Finding max fraction for possible pairs...')
-        maxed = pd.concat(hbond_data).groupby(level=0).max()
+        maxed = pd.concat(hbond_data).groupby(level=0, as_index=False).max()
+        maxed.index = maxed.columns
         return maxed
 
 
