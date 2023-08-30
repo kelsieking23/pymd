@@ -116,6 +116,7 @@ class Hbond(Analysis):
         return maxed
 
 
+
     def bakerHubbard(self, freq, **kwargs):
         hbonds = mdtraj.baker_hubbard(self._traj, freq=freq, **kwargs)
         return hbonds
