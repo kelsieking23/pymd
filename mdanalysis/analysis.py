@@ -21,6 +21,7 @@ class Analysis:
         self._topfile = top
         self.traj = None
         self._traj = None
+        self.traj_iter = None
         self._output = None
         self.job_name = 'analysis'
         self.job_params = {}
@@ -186,6 +187,25 @@ class Analysis:
         # self.top = self.traj.topology
         return self
 
+    def iterloadTrajectory(self, stride=1, selection='all', chunk=0):
+            if isinstance(selection, str):
+                if (selection == '') or (selection == 'all'):
+                    sele = None
+                else:
+                    sele = self.top.select(selection)
+            elif isinstance(selection, (list, tuple)):
+                sele = np.array(selection)
+            elif isinstance(selection, np.ndarray):
+                sele = selection
+            elif selection is None:
+                sele = None
+            else:
+                raise ValueError('Selection must be string, list, tuple, np.ndarray, or None')
+            if sele is None:
+                self.traj_iter = mdtraj.iterload(self.inp, top=self.top, chunk=chunk, stride=stride)
+            else:
+                self.traj_iter = mdtraj.iterload(self.inp, top=self.top, chunk=chunk, stride=stride, atom_indices=sele)
+            return self.traj_iter
     def superpose(self):
         if self.traj is not None:
             self.traj = self.traj.superpose(self.traj)

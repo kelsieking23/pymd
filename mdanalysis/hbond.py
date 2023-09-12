@@ -85,7 +85,7 @@ class Hbond(Analysis):
             raise ValueError('No method called {}. Only supported method currently is baker-hubbard'.format(method))
         if self.verbose:
             print('Hbond calculation complete.')
-        # self.df.to_csv(self.output)
+        self.df.to_csv(self.output)
         
     def getBlankMatrix(self, top_atoms):
         m = {}

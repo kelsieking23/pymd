@@ -1,5 +1,6 @@
 import os 
 import sys
+from pymd.structure.structure_file import StructureFile
 
 def addChainID(filename, newfilename, nterm, cterm):
     
@@ -159,6 +160,60 @@ def renumberPDB(filename, newfilename, nterm, cterm):
 
     # return list of edited contents
     return newfilename
+
+def renumberByChain(filename, newfilename, start=1):
+    struct = StructureFile(filename)
+    new_contents = ['REMARK    RE-NUMBERED BY pymd.utilities.rewritepdb.renumberByChain\n']
+    res_counter = start
+    atom_counter = 1
+    last_chain_index = None
+    last_res_id = None
+    for i, ld in enumerate(struct.pdb()):
+        # write non-atom strings
+        if isinstance(ld, str):
+            new_contents.append(ld)
+            continue
+        
+        # get res id
+        res_id = ld.residue_name + str(ld.residue_number)
+
+        #check for residue change
+        if last_res_id is not None:
+            if last_res_id != res_id:
+                res_counter += 1
+
+        # check if residue counter > 9999
+        if res_counter > 9999:
+            res_counter = 0
+
+        # check if atom_counter > 99999
+        if atom_counter > 99999:
+            atom_counter = 0
+
+        # check chain index
+        if ld.chain_index != last_chain_index:
+            res_counter = start
+
+        # format and save line for writing
+        line_parts = ['ATOM', str(atom_counter), ld.atom_name, ld.residue_name, ld.chain, str(res_counter), 
+              ld.x, ld.y, ld.z, ld.occ, ld.temp, ld.segid, ld.elem, ld.charge]
+        if len(ld.atom_name) > 3:
+            line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        else:
+            line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        new_contents.append(line)
+
+        # update last data
+        last_chain_index = ld.chain_index
+        last_res_id = res_id
+        atom_counter += 1
+
+    # write file
+    f = open(newfilename, 'w')
+    for line in new_contents:
+        f.write(line)
+    f.close()
+
 
 # def editChainIDLipids(*)
 def editChainID(filename, *args, output=None, renumber_chains=False, chain_id='A'):

@@ -15,7 +15,10 @@ class StructureFile:
         f.close()
         for line in contents:
             yield line
-    
+
+    def get_atom_data_pdb(self, line):
+        pass
+
     def pdb(self):
         atoms = []
         model = 1
@@ -47,14 +50,25 @@ class StructureFile:
                     residue_index += 1
                 if (last_chain != chain):
                     chain_index += 1
+                if (chain == '') or (chain == ' '):
+                    _chain_index = -1
+                else:
+                    _chain_index = chain_index
                 x = float(line[30:38].strip())
                 y = float(line[38:46].strip())
                 z = float(line[46:54].strip())
+                occ = float(line[54:60].strip())
+                temp = float(line[60:66].strip())
                 segid = line[72:76].strip()
                 elem = line[76:78].strip()
+                _charge = line.strip()[-1]
+                if (_charge == '+') or (_charge == '-'):
+                    charge = _charge
+                else:
+                    charge = ''
                 atom = AtomData(atom_number, atom_index, atom_name, residue_name, residue_id, 
-                                chain, chain_index, residue_number, residue_index,
-                                x, y, z, segid, elem, model, box)
+                                chain, _chain_index, residue_number, residue_index,
+                                x, y, z, occ, temp, segid, elem, charge, model, box)
                 atom_index += 1
                 last_chain = chain
                 last_residue = residue_name + str(residue_number)
@@ -63,8 +77,8 @@ class StructureFile:
                 #TODO: add hetatm
                 pass
             else:
-                continue
-        return atoms
+                yield line
+        # return atoms
 
     def gro(self):
         return []
@@ -92,8 +106,11 @@ class AtomData:
     x: float
     y: float
     z: float
+    occ:float
+    temp:float
     segid: str
     elem: str
+    charge:str
     model: float
     box: tuple
 

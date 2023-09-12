@@ -7,10 +7,10 @@ def lipids():
             'CER1']
 
 def ions():
-    return ['k'.upper(), 'cl'.upper(), 'na'.upper(), 'sod'.upper(), 'cla'.upper()]
+    return ['k'.upper(), 'cl'.upper(), 'na'.upper(), 'sod'.upper(), 'cla'.upper(), 'pot'.upper()]
 
 def solvent():
-        solvent = ['sol', 'tip3p', 'tip3']
+        solvent = ['sol', 'tip3p', 'tip3', 'hoh']
         return [sol.upper() for sol in solvent]
 
 def caps():
