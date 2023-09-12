@@ -203,15 +203,17 @@ class Solvent(Analysis):
         return all_solvent
     
 
-    def run(self, method='shell', radius=1, stride=1, selection='all', chunk=100, output_prefix='solvent', output_path=''):
+    def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', output_path=''):
         self._output = f'{output_prefix}.csv'
         if self.traj_iter is None:
             self.iterloadTrajectory(stride=stride, selection=selection, chunk=chunk)
         frame_idx = 0
         solvent_data = []
         solvent_ndx = []
-
+        chunk_idx = 1
         for chunk in self.traj_iter: # type: ignore
+            print('Chunk {}'.format(chunk_idx))
+            print('...')
             first_time = None
             for frame in chunk:
                 shell = self.get_solvent_shell(frame, radius)
@@ -221,6 +223,7 @@ class Solvent(Analysis):
                 if first_time is None:
                     first_time = frame._time[0]
             np.save(os.path.join(output_path, 'solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))), solvent_ndx)
+            print('Wrote {} '.format('solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
         df.to_csv(os.path.join(output_path, '{}.csv'.format(output_prefix)))
                 
