@@ -50,6 +50,7 @@ class Solvent(Analysis):
             'S':32.06,
             'P':30.974
         }
+        self.traj_iter = None
     
     def get_residue_coms(self, frame):
         residues = {}
