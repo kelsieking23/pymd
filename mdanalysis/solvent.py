@@ -113,7 +113,7 @@ class Solvent(Analysis):
         y = []
         z = []
         for i, atom in enumerate(self.top.atoms):
-            if atom.residue.chain_index != chain_index:
+            if atom.residue.chain.index != chain_index:
                 continue
             atom_mass = self.atomic_masses[atom.element.symbol]
             x.append(frame._xyz[0][atom.index,0] * atom_mass)
