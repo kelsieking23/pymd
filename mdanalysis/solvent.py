@@ -243,6 +243,7 @@ class Solvent(Analysis):
         '''
         if self.verbose:
             print('>>> Trimming solvent indeces by {}'.format(by))
+            print('***')
         element_coms = []
         radii = []
         if by == 'protein':
@@ -251,19 +252,24 @@ class Solvent(Analysis):
         elif (by == 'peptide') or (by == 'chain'):
             for chain_index in self.chain_idx:
                 if self.verbose:
-                    print('>>> Chain {}'.format(chain_index))
-                element_coms.append(self.get_chain_com(frame, chain_index))
+                    print('>>>> Chain {}'.format(chain_index))
                 atoms = [atom for atom in self.protein_atoms if atom.residue.chain.index == chain_index]
+                if self.verbose:
+                    print('>>>> Atoms in chain: {}'.format(len(atoms)))
+                com = self.get_com(frame, atoms)
+                if self.verbose:
+                    print('>>>> {}'.format(com))
+                element_coms.append(com)
                 radius = self.get_max_dist(frame, atoms)
                 if radius is None:
                     raise ValueError('Radius for chain index {} was None: is selection empty? Num atoms in selection: {}'.format(chain_index, len(atoms)))
                 radii.append(radius + 0.5)
                 if self.verbose:
-                    print('>>> Radius {:.3f}, using 0.5 nm buffer ({:.3f})'.format(radius, radius+0.5))
+                    print('>>>> Radius {:.3f}, using 0.5 nm buffer ({:.3f})'.format(radius, radius+0.5))
         else:
             raise ValueError('Can only trim solvent by protein, or peptide/chain. Keywords "protein", "peptide", "chain" only accepted')
         if self.verbose:
-            print('>>> Distance calculations for solvent trimming ...')
+            print('>>>> Distance calculations for solvent trimming ...')
         solvent = frame._xyz[0][self.solvent_indeces]
         all_solv_index = []
         for com, radius in zip(element_coms, radii):
@@ -271,12 +277,14 @@ class Solvent(Analysis):
             solvent_within_radius = self.solvent_indeces[idx]
             all_solv_index.append(solvent_within_radius[:])
         if self.verbose:
-            print('>>> Preparing trimmed solvent ...')
+            print('>>>> Preparing trimmed solvent ...')
         all_solv_concat = np.concatenate(all_solv_index)
         trimmed_index = np.unique(all_solv_concat)
         trimmed_xyz = solvent[trimmed_index]
         if self.verbose:
-            print('>>> Solvent preparation complete.')
+            print('>>>> Solvent preparation complete.')
+            print('>>>> Trimmed solvent has {} atoms'.format(len(trimmed_index)))
+            print('***')
         return trimmed_index, trimmed_xyz
 
     def get_solvent_shell(self, frame, radius, trim_by):
@@ -294,8 +302,6 @@ class Solvent(Analysis):
                 print('>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
         else:
             solvent_idx, solvent_xyz = self.trim_solvent(frame, by=trim_by)
-            if self.verbose:
-                print('>>> Trimmed solvent has {} atoms'.format(len(solvent_idx)))
         if self.verbose:
             print('>>> Calculating distances...')
         for residue in frame.top.residues:
@@ -339,12 +345,12 @@ class Solvent(Analysis):
             if self.verbose:
                 print('> Chunk {}'.format(chunk_idx))
                 print('> ', chunk)
-                print('************')
+                print('***')
             first_time = None
             for frame in chunk:
                 if self.verbose:
                     print('>> Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
-                    print('************')
+                    print('***')
                 shell = self.get_solvent_shell(frame, radius, trim_by)
                 solvent_ndx.append(shell)
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])
