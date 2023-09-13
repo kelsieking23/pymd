@@ -213,10 +213,14 @@ class Solvent(Analysis):
         solvent_ndx = []
         chunk_idx = 1
         for chunk in self.traj_iter: # type: ignore
-            print('Chunk {}'.format(chunk_idx))
-            print('...')
+            if self.verbose:
+                print('Chunk {}'.format(chunk_idx))
+                print('...')
             first_time = None
             for frame in chunk:
+                if self.verbose:
+                    print('   Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
+                    print('   ...')
                 shell = self.get_solvent_shell(frame, radius)
                 solvent_ndx.append(shell)
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])
@@ -224,7 +228,8 @@ class Solvent(Analysis):
                 if first_time is None:
                     first_time = frame._time[0]
             np.save(os.path.join(output_path, 'solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))), solvent_ndx)
-            print('Wrote {} '.format('solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))))
+            if self.verbose:
+                print('Wrote {} '.format('solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
         df.to_csv(os.path.join(output_path, '{}.csv'.format(output_prefix)))
                 
