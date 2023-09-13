@@ -294,7 +294,7 @@ class Solvent(Analysis):
             print('***')
         return trimmed_index, trimmed_xyz
 
-    def get_solvent_shell(self, frame, radius, trim_by):
+    def get_solvent_shell(self, frame, radius):
         '''
         Get solvent shell within a given radius of the protein COM at a given frame. 
         frame (traj): frame of trajectory
@@ -302,13 +302,10 @@ class Solvent(Analysis):
         '''
         _canonical = canonical()
         all_solv_index = []
-        if trim_by is None:
-            solvent_idx = self.solvent_indeces
-            solvent_xyz = frame._xyz[0][self.solvent_indeces]
-            if self.verbose:
-                print('>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
-        else:
-            solvent_idx, solvent_xyz = self.trim_solvent(frame, by=trim_by)
+        solvent_idx = self.solvent_indeces
+        solvent_xyz = frame._xyz[0][self.solvent_indeces]
+        if self.verbose:
+            print('>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
         if self.verbose:
             print('>>> Getting residue COMs ...')
         residue_coms = []
