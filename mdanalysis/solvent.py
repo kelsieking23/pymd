@@ -177,12 +177,15 @@ class Solvent(Analysis):
         z = sum(z) / mass
         return np.array((x,y,z))
     @staticmethod
-    def points_within_radius(array, center_point, radius):
+    def points_within_radius(array, center_points, radius):
         # Calculate Euclidean distances between all points and the center point
-        distances = np.linalg.norm(array - center_point, axis=1)
+        distances = np.linalg.norm(array[:, np.newaxis, :] - center_points, axis=2)
+
+        # Create a boolean mask where True indicates points within the radius
+        within_radius_mask = distances <= radius
 
         # Find indexes of points within the specified radius
-        within_radius_indices = np.where(distances <= radius)[0]
+        within_radius_indices = [np.where(mask)[0] for mask in within_radius_mask]
 
         return within_radius_indices
     
@@ -304,19 +307,26 @@ class Solvent(Analysis):
             solvent_idx, solvent_xyz = self.trim_solvent(frame, by=trim_by)
         if self.verbose:
             print('>>> Calculating distances...')
+        residue_coms = []
         for residue in frame.top.residues:
             if residue.name not in _canonical:
                 continue
             if self.verbose:
                 print(f'>>> (Frame {frame._time[0]}) {residue.name}')
-                print('>>> Getting residue COM ...')
+                print('>>>> Getting residue COM ...')
             com = self.get_residue_com(frame, residue)
+            residue_coms.append(com)
             if self.verbose:
-                print(f'>>> {com}')
-                print('>>> Getting solvent indeces within radius of {} ...'.format(radius))
-            idx = self.points_within_radius(solvent_xyz, com, radius)
-            solvent_within_radius = solvent_idx[idx]
-            all_solv_index.append(solvent_within_radius[:])
+                print(f'>>>> {com}')
+        if self.verbose:
+            print('>>> Found all residue COMs for frame.')
+            print('>>> Getting solvent indeces within radius of {} ...'.format(radius))
+        coms = np.array(residue_coms)
+        idx = self.points_within_radius(solvent_xyz, coms, radius)
+        if self.verbose:
+            print(idx)
+        solvent_within_radius = solvent_idx[idx]
+        all_solv_index.append(solvent_within_radius[:])
         if self.verbose:
             print('>>> Concatenating solvent indeces ...')
         all_solv_concat = np.concatenate(all_solv_index)
@@ -345,12 +355,12 @@ class Solvent(Analysis):
             if self.verbose:
                 print('> Chunk {}'.format(chunk_idx))
                 print('> ', chunk)
-                print('***')
+                print('*')
             first_time = None
             for frame in chunk:
                 if self.verbose:
                     print('>> Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
-                    print('***')
+                    print('**')
                 shell = self.get_solvent_shell(frame, radius, trim_by)
                 solvent_ndx.append(shell)
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])

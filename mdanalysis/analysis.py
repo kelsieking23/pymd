@@ -27,6 +27,7 @@ class Analysis:
         self.job_params = {}
         self.load_state = False
         self.verbose = True
+        self._top = mdtraj.load(self.topfile).topology
         self.__dict__.update(kwargs)
 
     
@@ -45,7 +46,7 @@ class Analysis:
     @property
     def top(self):
         if self.traj is None:
-            return mdtraj.load(self.topfile).topology
+            return self._top
         else:
             return self.traj.topology
 
