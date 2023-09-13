@@ -356,7 +356,7 @@ class Solvent(Analysis):
                     print('>> Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
                     print('**')
                 shell = self.get_solvent_shell(frame, radius)
-                solvent_ndx[frame._time[0]] = shell
+                solvent_ndx[str(int(frame._time[0]))] = shell
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])
                 frame_idx += 1
                 if first_time is None:
