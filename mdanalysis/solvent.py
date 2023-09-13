@@ -369,7 +369,7 @@ class Solvent(Analysis):
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
             np.savez(out, *solvent_ndx)
             if self.verbose:
-                print('Wrote {} '.format(out)
+                print('Wrote {} '.format(out))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
         df.to_csv(os.path.join(output_path, '{}.csv'.format(output_prefix)))
                 
