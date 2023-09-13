@@ -189,22 +189,36 @@ class Solvent(Analysis):
         frame (traj): frame of trajectory
         radius ('auto', float): radius at which to check
         '''
+        _canonical = canonical()
         all_solv_index = []
         solvent = frame._xyz[0][self.solvent_indeces]
         if self.verbose:
             print('     Calculating distances...')
         for residue in frame.top.residues:
-            if residue.name not in canonical():
+            if residue.name not in _canonical:
                 continue
+            if self.verbose:
+                print(f'     {residue.name}')
+                print('     Getting residue COM ...')
             com = self.get_residue_com(frame, residue)
+            if self.verbose:
+                print(f'     {com}')
+                print('     Getting solvent indeces within radius of {} ...'.format(radius))
             idx = self.points_within_radius(solvent, com, radius)
             solvent_within_radius = self.solvent_indeces[idx]
             all_solv_index.append(solvent_within_radius[:])
+        if self.verbose:
+            print('     Concatenating solvent indeces ...')
         all_solv_concat = np.concatenate(all_solv_index)
+        if self.verbose:
+            print('     Finding unique solvent indeces ...')
         all_solv_unique = np.unique(all_solv_concat)
+        if self.verbose:
+            print('     Making solvent whole (finding hydrogens) ...')
         all_solvent = self.get_HOH_indeces(all_solv_unique)
         if self.verbose:
-            print('     Frame {} found {} unique solvent atoms in radius of {}'.format(frame._time[0], len(all_solv_unique), radius))
+            print(f'    Frame {frame._time[0]} complete.')
+            print('     Found {} unique solvent atoms'.format(len(all_solv_unique)))
             print('     Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
         return all_solvent
     
