@@ -348,7 +348,7 @@ class Solvent(Analysis):
         solvent_data = []
         chunk_idx = 1
         for chunk in self.traj_iter: # type: ignore
-            solvent_ndx = []
+            solvent_ndx = {}
             if self.verbose:
                 print('> Chunk {}'.format(chunk_idx))
                 print('> ', chunk)
@@ -359,7 +359,7 @@ class Solvent(Analysis):
                     print('>> Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
                     print('**')
                 shell = self.get_solvent_shell(frame, radius, trim_by)
-                solvent_ndx.append(shell)
+                solvent_ndx[frame._time[0]] = shell
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])
                 frame_idx += 1
                 if first_time is None:
@@ -367,7 +367,7 @@ class Solvent(Analysis):
             start_str = str(int(first_time))
             end_str = str(int(frame._time[0]))
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
-            np.savez(out, *solvent_ndx)
+            np.savez(out, **solvent_ndx)
             if self.verbose:
                 print('Wrote {} '.format(out))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
