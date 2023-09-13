@@ -334,7 +334,7 @@ class Solvent(Analysis):
             print('>>> Making solvent whole (finding hydrogens) ...')
         all_solvent = self.get_HOH_indeces(all_solv_unique)
         if self.verbose:
-            print(f'    Frame {frame._time[0]} complete.')
+            print(f'>>> Frame {frame._time[0]} complete.')
             print('>>> Found {} unique solvent atoms'.format(len(all_solv_unique)))
             print('>>> Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
         return all_solvent
@@ -366,10 +366,10 @@ class Solvent(Analysis):
                     first_time = frame._time[0]
             start_str = str(int(first_time / 1000))
             end_str = str(int(frame._time[0] / 1000))
-            out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npy')
-            np.save(out, solvent_ndx)
+            out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
+            np.savez(out, *solvent_ndx)
             if self.verbose:
-                print('Wrote {} '.format('solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))))
+                print('Wrote {} '.format(out)
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
         df.to_csv(os.path.join(output_path, '{}.csv'.format(output_prefix)))
                 
