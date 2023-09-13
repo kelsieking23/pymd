@@ -49,6 +49,23 @@ class Analysis:
         else:
             return self.traj.topology
 
+    @property
+    def chain_idx(self):
+        chain_idx = []
+        for chain in self.top.chains:
+            idx = chain.residue(0).chain.index
+            if idx not in chain_idx:
+                chain_idx.append(idx)
+        return np.array(chain_idx)
+    
+    @property
+    def protein_idx(self):
+        return self.top.select('protein')
+    
+    @property
+    def protein_atoms(self):
+        return np.array([self.top.atom(idx) for idx in self.protein_idx])
+    
     def save(self, **kwargs):
         params = {}
         manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']

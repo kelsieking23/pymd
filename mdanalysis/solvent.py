@@ -89,7 +89,7 @@ class Solvent(Analysis):
         z = sum(z) / mass
         return np.array((x,y,z))
     
-    def get_frame_com(self, frame):
+    def get_protein_com(self, frame):
         x = []
         y = []
         z = []
@@ -107,6 +107,24 @@ class Solvent(Analysis):
         z = sum(z) / mass
         return np.array((x, y, z))
 
+    def get_chain_com(self, frame, chain_index):
+        mass = 0
+        x = []
+        y = []
+        z = []
+        for i, atom in enumerate(self.top.atoms):
+            if atom.residue.chain_index != chain_index:
+                continue
+            atom_mass = self.atomic_masses[atom.element.symbol]
+            x.append(frame._xyz[0][atom.index,0] * atom_mass)
+            y.append(frame._xyz[0][atom.index,1] * atom_mass)
+            z.append(frame._xyz[0][atom.index,2] * atom_mass)  
+            mass  += atom_mass
+        x = sum(x) / mass
+        y = sum(y) / mass
+        z = sum(z) / mass
+        return np.array((x,y,z))
+
     def get_max_dist_frame(self, frame):
         '''
         get the maximum distance between any two protein atoms in a frame
@@ -123,6 +141,41 @@ class Solvent(Analysis):
                 longest = dist
     #         print(i, dist, longest)
         return longest
+
+    def get_max_dist(self, frame, atoms):
+        '''
+        get max dist between any two atoms
+        '''
+        xyz = frame._xyz[0][np.array([atom.index for atom in atoms])]
+        longest = None
+        for i in range(0,3):
+            _min = xyz[:,i].min()
+            _max = xyz[:,i].max()
+            dist = _max - _min
+            if longest is None:
+                longest = dist
+            if dist > longest:
+                longest = dist
+        return longest
+    
+    def get_com(self, frame, atoms):
+        '''
+        Get COM from a collection of atoms
+        '''
+        mass = 0
+        x = []
+        y = []
+        z = []
+        for i, atom in enumerate(atoms):
+            atom_mass = self.atomic_masses[atom.element.symbol]
+            x.append(frame._xyz[0][atom.index,0] * atom_mass)
+            y.append(frame._xyz[0][atom.index,1] * atom_mass)
+            z.append(frame._xyz[0][atom.index,2] * atom_mass)  
+            mass  += atom_mass
+        x = sum(x) / mass
+        y = sum(y) / mass
+        z = sum(z) / mass
+        return np.array((x,y,z))
     @staticmethod
     def points_within_radius(array, center_point, radius):
         # Calculate Euclidean distances between all points and the center point
@@ -183,7 +236,46 @@ class Solvent(Analysis):
     def solvent_indeces(self):
         return self.top.select('(water and name O) or name {}'.format(' or name '.join(self.ion_names())))
     
-    def get_solvent_shell(self, frame, radius):
+    def trim_solvent(self, frame, by='protein'):
+        '''
+        Get solvent indeces within a certain radius of the protein, or by individual peptides
+        returns (trimmed_index, trimmed_xyz)
+        '''
+        if self.verbose:
+            print('>>>> Trimming solvnet indeces by {}'.format(by))
+        element_coms = []
+        radii = []
+        if by == 'protein':
+            element_coms = [self.get_protein_com(frame)]
+            radii = [self.get_max_dist_frame(frame)]
+        elif (by == 'peptide') or (by == 'chain'):
+            for chain_index in self.chain_idx:
+                element_coms.append(self.get_chain_com(frame, chain_index))
+                atoms = [atom for atom in self.protein_atoms if atom.residue.chain.index == chain_index]
+                radius = self.get_max_dist(frame, atoms)
+                if radius is None:
+                    raise ValueError('Radius for chain index {} was None: is selection empty? Num atoms in selection: {}'.format(chain_index, len(atoms)))
+                radii.append(radius + 0.5)
+        else:
+            raise ValueError('Can only trim solvent by protein, or peptide/chain. Keywords "protein", "peptide", "chain" only accepted')
+        if self.verbose:
+            print('>>>> Distance calculations for solvent trimming ...')
+        solvent = frame._xyz[0][self.solvent_indeces]
+        all_solv_index = []
+        for com, radius in zip(element_coms, radii):
+            idx = self.points_within_radius(solvent, com, radius)
+            solvent_within_radius = self.solvent_indeces[idx]
+            all_solv_index.append(solvent_within_radius[:])
+        if self.verbose:
+            print('>>>> Preparing trimmed solvent ...')
+        all_solv_concat = np.concatenate(all_solv_index)
+        trimmed_index = np.unique(all_solv_concat)
+        trimmed_xyz = solvent[trimmed_index]
+        if self.verbose:
+            print('>>>> Solvent preparation complete.')
+        return trimmed_index, trimmed_xyz
+
+    def get_solvent_shell(self, frame, radius, trim_by):
         '''
         Get solvent shell within a given radius of the protein COM at a given frame. 
         frame (traj): frame of trajectory
@@ -191,39 +283,47 @@ class Solvent(Analysis):
         '''
         _canonical = canonical()
         all_solv_index = []
-        solvent = frame._xyz[0][self.solvent_indeces]
+        if trim_by is None:
+            solvent_idx = self.solvent_indeces
+            solvent_xyz = frame._xyz[0][self.solvent_indeces]
+            if self.verbose:
+                print('>>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
+        else:
+            solvent_idx, solvent_xyz = self.trim_solvent(frame, by=trim_by)
+            if self.verbose:
+                print('>>>> Trimmed solvent has {} atoms'.format(len(solvent_idx)))
         if self.verbose:
-            print('     Calculating distances...')
+            print('>>>> Calculating distances...')
         for residue in frame.top.residues:
             if residue.name not in _canonical:
                 continue
             if self.verbose:
-                print(f'     {residue.name}')
-                print('     Getting residue COM ...')
+                print(f'>>>> (Frame {frame._time[0]}) {residue.name}')
+                print('>>>> Getting residue COM ...')
             com = self.get_residue_com(frame, residue)
             if self.verbose:
-                print(f'     {com}')
-                print('     Getting solvent indeces within radius of {} ...'.format(radius))
-            idx = self.points_within_radius(solvent, com, radius)
-            solvent_within_radius = self.solvent_indeces[idx]
+                print(f'>>>> {com}')
+                print('>>>> Getting solvent indeces within radius of {} ...'.format(radius))
+            idx = self.points_within_radius(solvent_xyz, com, radius)
+            solvent_within_radius = solvent_idx[idx]
             all_solv_index.append(solvent_within_radius[:])
         if self.verbose:
-            print('     Concatenating solvent indeces ...')
+            print('>>>> Concatenating solvent indeces ...')
         all_solv_concat = np.concatenate(all_solv_index)
         if self.verbose:
-            print('     Finding unique solvent indeces ...')
+            print('>>>> Finding unique solvent indeces ...')
         all_solv_unique = np.unique(all_solv_concat)
         if self.verbose:
-            print('     Making solvent whole (finding hydrogens) ...')
+            print('>>>> Making solvent whole (finding hydrogens) ...')
         all_solvent = self.get_HOH_indeces(all_solv_unique)
         if self.verbose:
             print(f'    Frame {frame._time[0]} complete.')
-            print('     Found {} unique solvent atoms'.format(len(all_solv_unique)))
-            print('     Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
+            print('>>>> Found {} unique solvent atoms'.format(len(all_solv_unique)))
+            print('>>>> Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
         return all_solvent
     
 
-    def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', output_path=''):
+    def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', trim_by='protein', output_path=''):
         self._output = f'{output_prefix}.csv'
         if self.traj_iter is None:
             self.iterloadTrajectory(stride=stride, selection=selection, chunk=chunk)
