@@ -310,25 +310,18 @@ class Solvent(Analysis):
         else:
             solvent_idx, solvent_xyz = self.trim_solvent(frame, by=trim_by)
         if self.verbose:
-            print('>>> Calculating distances...')
+            print('>>> Getting residue COMs ...')
         residue_coms = []
         for residue in frame.top.residues:
             if residue.name not in _canonical:
                 continue
-            if self.verbose:
-                print(f'>>> (Frame {frame._time[0]}) {residue.name}')
-                print('>>>> Getting residue COM ...')
             com = self.get_residue_com(frame, residue)
             residue_coms.append(com)
-            if self.verbose:
-                print(f'>>>> {com}')
         if self.verbose:
             print('>>> Found all residue COMs for frame.')
             print('>>> Getting solvent indeces within radius of {} ...'.format(radius))
         coms = np.array(residue_coms)
         idx = self.points_within_radius(solvent_xyz, coms, radius)
-        if self.verbose:
-            print(idx)
         solvent_within_radius = solvent_idx[idx]
         all_solv_index.append(solvent_within_radius[:])
         if self.verbose:
