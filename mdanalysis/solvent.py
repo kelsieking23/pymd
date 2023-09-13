@@ -40,6 +40,7 @@ class Solvent(Analysis):
         self.method = None
         self.matrix = pd.DataFrame()
         self.verbose = False
+        self._top = mdtraj.load(self.topfile).topology
         self.__dict__.update(kwargs)
         self.atomic_masses = {
             'C':12.011,
