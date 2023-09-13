@@ -187,8 +187,11 @@ class Solvent(Analysis):
 
         # Find indexes of points within the specified radius
         within_radius_indices = [np.where(mask)[0] for mask in within_radius_mask]
-
-        return within_radius_indices
+        within_radius = []
+        for i, point in enumerate(within_radius_indices):
+            if point.size != 0:
+                within_radius.append(i)
+        return np.array(within_radius)
     
     def get_HOH_indeces(self, indeces):
         '''
