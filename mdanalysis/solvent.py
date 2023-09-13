@@ -215,6 +215,7 @@ class Solvent(Analysis):
         for chunk in self.traj_iter: # type: ignore
             if self.verbose:
                 print('Chunk {}'.format(chunk_idx))
+                print(chunk)
                 print('...')
             first_time = None
             for frame in chunk:
