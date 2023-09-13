@@ -191,6 +191,8 @@ class Solvent(Analysis):
         '''
         all_solv_index = []
         solvent = frame._xyz[0][self.solvent_indeces]
+        if self.verbose:
+            print('     Calculating distances...')
         for residue in frame.top.residues:
             if residue.name not in canonical():
                 continue
@@ -201,6 +203,9 @@ class Solvent(Analysis):
         all_solv_concat = np.concatenate(all_solv_index)
         all_solv_unique = np.unique(all_solv_concat)
         all_solvent = self.get_HOH_indeces(all_solv_unique)
+        if self.verbose:
+            print('     Frame {} found {} unique solvent atoms in radius of {}'.format(frame._time[0], len(all_solv_unique), radius))
+            print('     Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
         return all_solvent
     
 
