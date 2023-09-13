@@ -353,9 +353,9 @@ class Solvent(Analysis):
             self.iterloadTrajectory(stride=stride, selection=selection, chunk=chunk)
         frame_idx = 0
         solvent_data = []
-        solvent_ndx = []
         chunk_idx = 1
         for chunk in self.traj_iter: # type: ignore
+            solvent_ndx = []
             if self.verbose:
                 print('> Chunk {}'.format(chunk_idx))
                 print('> ', chunk)
@@ -371,7 +371,10 @@ class Solvent(Analysis):
                 frame_idx += 1
                 if first_time is None:
                     first_time = frame._time[0]
-            np.save(os.path.join(output_path, 'solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))), solvent_ndx)
+            start_str = str(int(first_time / 1000))
+            end_str = str(int(frame._time[0] / 1000))
+            out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npy')
+            np.save(out, solvent_ndx)
             if self.verbose:
                 print('Wrote {} '.format('solvidx.{}.{}.npy'.format(str(first_time), str(frame._time[0]))))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
