@@ -340,7 +340,7 @@ class Solvent(Analysis):
         return all_solvent
     
 
-    def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', trim_by='protein', output_path=''):
+    def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', output_path=''):
         self._output = f'{output_prefix}.csv'
         if self.traj_iter is None:
             self.iterloadTrajectory(stride=stride, selection=selection, chunk=chunk)
@@ -371,7 +371,11 @@ class Solvent(Analysis):
             if self.verbose:
                 print('Wrote {} '.format(out))
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
-        df.to_csv(os.path.join(output_path, '{}.csv'.format(output_prefix)))
+        df_out = os.path.join(output_path, '{}.csv'.format(output_prefix))
+        df.to_csv(df_out)
+        if self.verbose:
+            print('Wrote {}'.format(df_out))
+            print('Job complete.')
                 
 
 
