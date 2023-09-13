@@ -364,8 +364,8 @@ class Solvent(Analysis):
                 frame_idx += 1
                 if first_time is None:
                     first_time = frame._time[0]
-            start_str = str(int(first_time / 1000))
-            end_str = str(int(frame._time[0] / 1000))
+            start_str = str(int(first_time))
+            end_str = str(int(frame._time[0]))
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
             np.savez(out, *solvent_ndx)
             if self.verbose:
