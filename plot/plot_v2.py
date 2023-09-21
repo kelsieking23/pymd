@@ -136,12 +136,18 @@ class Plotter():
             pass
         return ax
     
-    def timeseries(self, df, panel=False, ax=None, show=False, **kwargs):
+    def timeseries(self, df, panel=False, ax=None, show=False, titles=[], **kwargs):
         if panel is True:
-            for (i, col) in enumerate(df.columns):
-                data = pd.DataFrame()
-                data[col] = df[col]
-                self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
+            if isinstance(df, pd.DataFrame):
+                for (i, col) in enumerate(df.columns):
+                    data = pd.DataFrame()
+                    data[col] = df[col]
+                    self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
+            elif isinstance(df, (list, tuple, np.ndarray)):
+                for (i, data) in enumerate(df):
+                    if titles != []:
+                        kwargs['title'] = titles[i]
+                    self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
             self._fix_labels()
             return self.axes
         else:
