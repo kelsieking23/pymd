@@ -7,7 +7,7 @@ from typing import Optional, Any
 import random
 
 from pymd.mdanalysis.analysis import Analysis
-from pymd.mdanalysis.rmsd import RMSD
+from mdanalysis.rmsd_old import RMSD
 from pymd.utilities.rewritepdb import writePDB
 
 class GROMOS(Analysis):
@@ -100,7 +100,7 @@ class GROMOS(Analysis):
         for reference_index in range(start_index, stop_index): 
             reference = self.frames[reference_index]
             rms.reference = reference
-            rmsd = rms.rmsdOverTime(frames=self.frames[reference_index:])
+            rmsd = rms.rmsdOverTimeOLD(frames=self.frames[reference_index:])
             fill = [None]*(reference_index)
             if fill != []:
                 df[reference_index] = fill + rmsd

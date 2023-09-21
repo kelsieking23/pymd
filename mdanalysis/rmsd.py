@@ -1,84 +1,106 @@
-import math
-from operator import index
-import mdtraj
-import numpy as np
 import os
-import pandas as pd
 import sys
+import mdtraj
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
+import numpy as np
+import pandas as pd
+from pymd.mdanalysis.analysis import Analysis
+from pymd.utilities.library import residues as canonical
+from pymd.utilities.library import ions as _ion_names
+from pymd.utilities.library import solvent as _solvent_names
+import time
 
 
+class RMSD(Analysis):
 
-class RMSD:
+    def __init__(self, inp, top, parent=None, **kwargs):
+        '''
+        For now, takes a dict of parameters from run.py call
+        '''
+        self.parent = parent
+        self._inp = inp
+        self._topfile = top
+        # self.top = None
+        self.traj = None
+        self._traj = None
+        self.stride = 1
+        self.b = 0
+        self.e = -1
+        self.res = None
+        self._exclude_chain = True
+        self.exclude_neighbors = 2
+        self._output = 'rmsd.csv'
+        self.job_name = 'rmsd'
+        self.nprocs = 'auto'
+        self.compress = False
+        self.selection = 'all'
+        self.df = pd.DataFrame()
+        self._iterload = False
+        self.method = None
+        self.matrix = pd.DataFrame()
+        self.verbose = False
+        self._top = mdtraj.load(self.topfile).topology
+        self.__dict__.update(kwargs)
+        self.atomic_masses = {
+            'C':12.011,
+            'A':12.011,
+            'N':14.007,
+            'H':1.008,
+            'O':15.999,
+            'S':32.06,
+            'P':30.974
+        }
+        self.traj_iter = None
 
-    def __init__(self, traj, reference=None, cutoff=0, binary=False, time=None):
-        self.traj = traj._xyz
-        if reference is None:
-            self.reference = self.first_frame
-        else:
-            self.reference = reference
-        # self.time = traj.time
-        self.cutoff = cutoff
-        self.binary = binary
-        self.time = time
-        # rmsd = self.rmsdOverTime()
-        # self.rmsd = self.makeDataFrame(rmsd)
-        # print(self.rmsd)
-        # self.writeFile()
-
-    @property
-    def first_frame(self):
-        return self.traj[0]
-
-    def squareDist(self, a1, a0):
-        sqd = ((a1[0] - a0[0]) ** 2) + ((a1[1] - a0[1]) ** 2) + ((a1[2] - a0[2]) ** 2)
-        return sqd
-
-    def calcRMSD(self, frame, reference=None):
-        total_sqd = 0
-        if reference is None:
-            reference = self.reference
-        return np.sqrt((np.linalg.norm(frame-reference)**2)/frame.shape[0])
-        # for i in range(0, frame.shape[0]):
-        #     total_sqd += self.squareDist(frame[i], reference[i])
-        # return np.sqrt(total_sqd / frame.shape[0])
-        # rmsd = np.linalg.norm(frame-reference) / frame.shape[0]
-        # if self.binary:
-        #     if rmsd > self.cutoff:
-        #         return rmsd
-        #     else:
-        #         return 0
-        # return rmsd
-    
-    def rmsdOverTime(self, frames = None, reference = None):
-        if frames is None:
-            rmsd = list(map(self.calcRMSD, self.traj))
-        else:
-            rmsd = list(map(self.calcRMSD, frames))
-        # self.rmsd = self.makeDataFrame(rmsd)
-        return rmsd
-
-    def matrix(self, to_csv=None):
-        df = pd.DataFrame(index=[i for i in range(0, len(self.traj.frames))], columns=[i for i in range(0, len(self.traj.frames))])
-        i = 0
-        frames = [np.array(frame) for frame in self.traj.frames]
-        frames = np.array(frames)
+    @staticmethod
+    def rmsd(frames, ref):
+        rms = []
         for frame in frames:
-            self.reference = frame
-            rms = np.array(self.rmsdOverTime())
-            df.loc[i,:] = rms
-            i += 1
-        X = df.to_numpy(dtype='float64')
-        if to_csv is not None:
-            np.savetxt(to_csv, X, delimiter=',')
-        return X
-
-
-    def makeDataFrame(self, rmsd):
-        df = pd.DataFrame(rmsd, index=[i for i in range(len(rmsd))])
-        return df
-        
-    def writeFile(self, output='rmsd.csv'):
-        self.rmsd.to_csv(output, header='RMSD', index_label='Time')
-        
-
+            rms.append(np.sqrt((np.linalg.norm(frame-ref) / frame.shape[0])))
+        return np.array(rms)
     
+    def run(self, selection='backbone', by='protein', ref_idx=0, output='rmsd.csv'):
+        self._output = output
+        self.save(selection=selection, by=by)
+        if self.verbose:
+            if isinstance(by, str):
+                print('Starting RMSD calculation, by ({}) using selection ({})'.format(by, selection))
+            else:
+                print('Starting RMSD calculation, by ({}) using selection(s) ({})'.format(by, ', '.join(selection)))
+        selections = self.by_selection(by, selection)
+        df = pd.DataFrame()
+        for selstr, frames in selections:
+            if self.verbose:
+                print('Running for: {}'.format(selstr))
+            ref = frames[ref_idx]
+            df_column = '_'.join(selstr.split())
+            df[df_column] = self.rmsd(frames, ref)
+        self.df = df
+        self.df.to_csv(self.output)
+        if self.verbose:
+            print('RMSD calculation complete.')
+
+    def by_selection(self, by, selection):
+        if not isinstance(self.traj, mdtraj.Trajectory):
+            raise TypeError('No trajectory loaded')
+        selections = []
+        if by.lower() == 'protein':
+            sele = self.top.select('protein and {}'.format(selection))
+            return [('protein_and_{}'.format(selection), self.traj.atom_slice(sele)._xyz)]
+        if isinstance(by, str):
+            if by.lower() in ('chain', 'peptide', 'chainid'):
+                for chain in self.top.chains:
+                    selstr = '(chainid {}) and {}'.format(chain.index)
+                    sele = self.top.select(selstr)
+                    selections.append((selstr, self.traj.atom_slice(sele)._xyz))
+            else:
+                selstr = '({}) and {}'.format(by, selection)
+                sele = self.top.select(selstr)
+                selections.append((selstr, self.traj.atom_slice(sele)._xyz))
+        else:
+            for item in by:
+                selstr = '({}) and {}'.format(item, selection)
+                sele = self.top.select(selstr)
+                selections.append((selstr, self.traj.atom_slice(sele)._xyz))
+        return selections

@@ -19,7 +19,7 @@ import mdtraj
 import warnings
 warnings.filterwarnings('ignore')
 # sys.path.append('D:/Work/')
-from pymd.mdanalysis.rmsd import RMSD
+from mdanalysis.rmsd_old import RMSD
 # from pymd.mdanalysis.ndx import Ndx
 from pymd.utilities.rewritepdb import writePDB
 from pymd.structure.protein import Protein
@@ -250,7 +250,7 @@ class Cluster:
         for reference_index in range(start_index, stop_index): 
             reference = self.frames[reference_index]
             rms.reference = reference
-            rmsd = rms.rmsdOverTime(frames=self.frames[reference_index:])
+            rmsd = rms.rmsdOverTimeOLD(frames=self.frames[reference_index:])
             fill = [None]*(reference_index)
             if fill != []:
                 df[reference_index] = fill + rmsd

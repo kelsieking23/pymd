@@ -10,6 +10,7 @@ from pymd.mdanalysis.analysis import Analysis
 from pymd.utilities.library import residues as canonical
 from pymd.utilities.library import ions as _ion_names
 from pymd.utilities.library import solvent as _solvent_names
+import time
 
 
 class Solvent(Analysis):
@@ -159,6 +160,48 @@ class Solvent(Analysis):
                 longest = dist
         return longest
     
+    @staticmethod
+    def get_max_xyz(frame, selection=None):
+        x = 0
+        y = 0
+        z = 0
+        xyz = frame._xyz[0]
+        if selection is not None:
+            if selection.size != 0:
+                xyz = xyz[selection]
+        for i in range(0,3):
+            _min = xyz[:,i].min()
+            _max = xyz[:,i].max()
+            dist = _max - _min
+            if i == 0:
+                x = _max
+            if i == 1:
+                y = _max
+            if i == 2:
+                z = _max
+        return x, y, z
+
+    @staticmethod
+    def get_min_xyz(frame, selection=None):
+        x = 0
+        y = 0
+        z = 0
+        xyz = frame._xyz[0]
+        if selection is not None:
+            if selection.size != 0:
+                xyz = xyz[selection]
+        for i in range(0,3):
+            _min = xyz[:,i].min()
+            _max = xyz[:,i].max()
+            dist = _max - _min
+            if i == 0:
+                x = _min
+            if i == 1:
+                y = _min
+            if i == 2:
+                z = _min
+        return x, y, z
+    
     def get_com(self, frame, atoms):
         '''
         Get COM from a collection of atoms
@@ -234,10 +277,9 @@ class Solvent(Analysis):
     def solvent_types(self, solvent_indeces):
         return [[index, self.top.atom(index).name] for index in solvent_indeces]
 
-
     @property
     def protein_indeces(self):
-        return self.top.select("not (water or name {})".format(' or name '.join(self.ion_names())))
+        return self.top.select("protein")
     
     @property
     def solvent_indeces(self):
@@ -294,7 +336,7 @@ class Solvent(Analysis):
             print('***')
         return trimmed_index, trimmed_xyz
 
-    def get_solvent_shell(self, frame, radius):
+    def get_solvent_shell(self, frame, radius, periodic=[]):
         '''
         Get solvent shell within a given radius of the protein COM at a given frame. 
         frame (traj): frame of trajectory
@@ -304,23 +346,33 @@ class Solvent(Analysis):
         all_solv_index = []
         solvent_idx = self.solvent_indeces
         solvent_xyz = frame._xyz[0][self.solvent_indeces]
-        if self.verbose:
-            print('>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
+        # if self.verbose:
+        #     print('>>> No solvent trimming. Solvent has {} atoms'.format(len(solvent_idx)))
         if self.verbose:
             print('>>> Getting residue COMs ...')
+
         residue_coms = []
         for residue in frame.top.residues:
             if residue.name not in _canonical:
                 continue
             com = self.get_residue_com(frame, residue)
             residue_coms.append(com)
+        coms = np.array(residue_coms)
         if self.verbose:
             print('>>> Found all residue COMs for frame.')
+
+        if self.verbose:
             print('>>> Getting solvent indeces within radius of {} ...'.format(radius))
-        coms = np.array(residue_coms)
         idx = self.points_within_radius(solvent_xyz, coms, radius)
-        solvent_within_radius = solvent_idx[idx]
-        all_solv_index.append(solvent_within_radius[:])
+        if len(idx) != 0:
+            solvent_within_radius = solvent_idx[idx]
+            all_solv_index.append(solvent_within_radius[:])
+        if (len(periodic) != 0):
+            imgs = np.concatenate(periodic)
+            real_solvent_idx = np.array(list(self.solvent_indeces)*len(periodic))
+            periodic_idx = self.points_within_radius(imgs, coms, radius)
+            periodic_within_radius = (real_solvent_idx[periodic_idx])
+            all_solv_index.append(periodic_within_radius)
         if self.verbose:
             print('>>> Concatenating solvent indeces ...')
         all_solv_concat = np.concatenate(all_solv_index)
@@ -336,15 +388,51 @@ class Solvent(Analysis):
             print('>>> Found {} total solvent atoms (including hydrogens)'.format(len(all_solvent)))
         return all_solvent
     
+    def periodic_solvent(self, frame):
+        x_max, y_max, z_max = self.get_max_xyz(frame, self.solvent_indeces)
+        x_min, y_min, z_min = self.get_min_xyz(frame, self.solvent_indeces)
+        protein_xyz = frame._xyz[0][self.protein_indeces]
+        solvent_xyz = frame._xyz[0][self.solvent_indeces]
+        outside_cube_x = (
+            (protein_xyz[:, 0] < x_min) | (protein_xyz[:, 0] > x_max) 
+        )
+
+        outside_cube_y = (
+            (protein_xyz[:, 1] < y_min) | (protein_xyz[:, 1] > y_max) 
+        )
+
+        outside_cube_z = (
+            (protein_xyz[:, 2] < z_min) | (protein_xyz[:, 2] > z_max)
+        )
+
+        x = solvent_xyz[:,0]
+        y = solvent_xyz[:,1]
+        z = solvent_xyz[:,2]
+
+        solv_images = []
+        if len(self.protein_indeces[outside_cube_x]) > 0:
+            solv_images.append(np.column_stack((x-x_max, y, z)))
+            solv_images.append(np.column_stack((x+x_max, y, z)))
+        if len(self.protein_indeces[outside_cube_y]) > 0:
+            solv_images.append(np.column_stack((x, y+y_max, z)))
+            solv_images.append(np.column_stack((x, y-y_max, z)))
+        if len(self.protein_indeces[outside_cube_z]) > 0:
+            solv_images.append(np.column_stack((x, y, z+z_max)))
+            solv_images.append(np.column_stack((x, y, z-z_max)))
+        return solv_images
 
     def run(self, method='shell', radius=1.0, stride=1, selection='all', chunk=100, output_prefix='solvent', output_path=''):
+        starttime = time.time()
         self._output = f'{output_prefix}.csv'
         if self.traj_iter is None:
             self.iterloadTrajectory(stride=stride, selection=selection, chunk=chunk)
         frame_idx = 0
         solvent_data = []
         chunk_idx = 1
+        ftimes = []
+        ctimes = []
         for chunk in self.traj_iter: # type: ignore
+            cstart = time.time()
             solvent_ndx = {}
             if self.verbose:
                 print('> Chunk {}'.format(chunk_idx))
@@ -352,27 +440,81 @@ class Solvent(Analysis):
                 print('*')
             first_time = None
             for frame in chunk:
+                fstart = time.time()
                 if self.verbose:
                     print('>> Frame index {}, time {} ps'.format(frame_idx, frame._time[0]))
-                    print('**')
-                shell = self.get_solvent_shell(frame, radius)
+                images = self.periodic_solvent(frame)
+                if self.verbose:
+                    print('>> Made {} periodic images'.format(len(images)))
+                # images = np.array([])
+                shell = self.get_solvent_shell(frame, radius, periodic=images)
+                pdb_indeces = np.array(list(self.protein_indeces) + list(shell))
+                self._topdb(frame, pdb_indeces, os.path.join(output_path, f'test_shell_{frame_idx}.pdb'))
+
                 solvent_ndx[str(int(frame._time[0]))] = shell
                 solvent_data.append([frame_idx, frame._time[0], len(shell)])
                 frame_idx += 1
                 if first_time is None:
                     first_time = frame._time[0]
+                fend = time.time()
+                ftime = fend - fstart
+                if self.verbose:
+                    print('>> Frame runtime: {} s'.format(ftime))
+                    print('********')
+                ftimes.append(ftime)
             start_str = str(int(first_time))
             end_str = str(int(frame._time[0]))
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
             np.savez(out, **solvent_ndx)
+            cend = time.time()
+            ctime = cend - cstart
             if self.verbose:
                 print('Wrote {} '.format(out))
+                print('Chunk runtime: {:.2f} min'.format(ctime / 60))
+            ctimes.append(ctime)
         df = pd.DataFrame(solvent_data, columns=['frame_index', 'time', 'n_solvent'])
         df_out = os.path.join(output_path, '{}.csv'.format(output_prefix))
         df.to_csv(df_out)
         if self.verbose:
             print('Wrote {}'.format(df_out))
             print('Job complete.')
+        endtime = time.time()
+        runtime = endtime - starttime
+        if len(ctimes) != 0:
+            avg_ctime = sum(ctimes) / len(ctimes)
+            print('Average chunk time: {:.2f} min'.format(avg_ctime))
+        if len(ftimes) != 0:
+            avg_ftime = sum(ftimes) / len(ftimes)
+            print('Avg time per frame: {:.2f} s'.format(avg_ftime))
+            print('Total runtime: {:.2f} min'.format(runtime / 60))
+
+    def _topdb(self, frame, indeces, output, periodic=None):
+        chain_index = 0
+        chain_id = 'A'
+        contents = []
+        for i in indeces:
+            atom = frame.topology.atom(i)
+            if atom.residue.name in canonical():
+                if atom.residue.chain.index > chain_index:
+                    chain_index = atom.residue.chain.index
+                    chain_id = chr(ord(chain_id) + 1)
+            elif atom.residue.name in ['ACE', 'NH2']:
+                if atom.residue.chain.index > chain_index:
+                    chain_index = atom.residue.chain.index
+                    chain_id = chr(ord(chain_id) + 1)
+            else:
+                chain_id = ' '
+            x, y, z = tuple(frame._xyz[0][i]*10)
+            line_parts = ['ATOM', str(atom.index + 1), atom.name, atom.residue.name, chain_id, str(atom.residue.resSeq), x, y, z, 1.0, 0.0, atom.residue.segment_id, atom.element.symbol]
+            if len(atom.name) > 3:
+                line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}\n'.format(*line_parts)
+            else:
+                line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}\n'.format(*line_parts)
+            contents.append(line)
+        f = open(output, 'w')
+        for line in contents:
+            f.write(line)
+        f.close()
                 
 
 
