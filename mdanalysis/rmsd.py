@@ -91,7 +91,7 @@ class RMSD(Analysis):
         if isinstance(by, str):
             if by.lower() in ('chain', 'peptide', 'chainid'):
                 for chain in self.top.chains:
-                    selstr = '(chainid {}) and {}'.format(chain.index)
+                    selstr = '(chainid {}) and {}'.format(chain.index, selection)
                     sele = self.top.select(selstr)
                     selections.append((selstr, self.traj.atom_slice(sele)._xyz))
             else:
