@@ -7,6 +7,7 @@ from cycler import cycler
 from collections.abc import Iterable
 from pandas.core.algorithms import isin
 import math
+import matplotlib
 
 
 class Data:
@@ -141,7 +142,18 @@ class PlotData:
         if colors is None:
             # colors = ['#1f464c', '#2a8a2d', '#8a47b0', '#9bcccc']
             colors = plt.cm.tab20b(np.linspace(0, 1,len(df.columns)))
-            
+        else:
+            if isinstance(colors, (list, tuple, np.ndarray)):
+                colors = colors
+            elif isinstance(colors, matplotlib.colors.ListedColormap):
+                colors = colors(np.linspace(0,1,len(df.columns)))
+            elif isinstance(colors, str):
+                if colors in plt.colormaps():
+                    colors = plt.get_cmap(colors)(np.linspace(0,1, len(df.columns)))
+                else:
+                    raise ValueError('If colors is a str, must be in matplotlib supported colormaps. Supported colormaps are: {}'.format(', '.join(plt.colormaps())))
+            else:
+                raise ValueError('Colors must be list, tuple, np array, a matplotlib ListedColorMap, or a string corresponding to a matplotlib colormap')
         fig = None 
         # get plot data
         data = []
