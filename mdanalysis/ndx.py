@@ -318,7 +318,7 @@ class Ndx:
         backbone = ['ca', 'c', 'n']
         mainchain = ['ca', 'c', 'o', 'n', 'hn', 'h', 'ha', 'h1', 'h2', 'h3', 'o1', 'o2']
         ions = ['k', 'cl', 'na', 'sod', 'cla']
-        solvent = ['sol', 'tip3p']
+        solvent = ['sol', 'tip3p', 'tip3']
         headgroup_ids = ['o7', 'p8', 'p9', 'o10', 'o11']
         types = {
             'system':[],
@@ -424,6 +424,13 @@ class Ndx:
                     types[atom_name] = [atom_num]
                 else:
                     types[atom_name].append(atom_num)
+                # res id 
+                if res_name not in solvent:
+                    if res_id not in list(types.keys()):
+                        types[res_id] = []
+                        types[res_id].append(atom_num)
+                    else:
+                        types[res_id].append(atom_num)
                 if res_name in residues:
                     # protein atoms
                     types['protein'].append(atom_num)
@@ -452,13 +459,6 @@ class Ndx:
                         types['mainchain_h_nocaps'].append(atom_num)
                     if (atom_name not in mainchain) and (atom_name not in backbone):
                         types['sidechain'].append(atom_num)
-
-                    # res id 
-                    if res_id not in list(types.keys()):
-                        types[res_id] = []
-                        types[res_id].append(atom_num)
-                    else:
-                        types[res_id].append(atom_num)
 
                     # residue index
                     if last_res_id != res_id:

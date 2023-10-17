@@ -28,6 +28,7 @@ class Analysis:
         self.load_state = False
         self.verbose = True
         self._top = mdtraj.load(self.topfile).topology
+        self._root = os.path.dirname(self._inp)
         self.__dict__.update(kwargs)
 
     

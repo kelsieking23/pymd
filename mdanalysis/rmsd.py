@@ -60,6 +60,10 @@ class RMSD(Analysis):
             rms.append(np.sqrt((np.linalg.norm(frame-ref) / frame.shape[0])))
         return np.array(rms)
     
+    @staticmethod
+    def times(frames):
+        return np.array([frame._time[0] for frame in frames])
+    
     def run(self, selection='backbone', by='protein', ref_idx=0, output='rmsd.csv'):
         self._output = output
         self.save(selection=selection, by=by)
@@ -77,6 +81,8 @@ class RMSD(Analysis):
             df_column = '_'.join(selstr.split())
             df[df_column] = self.rmsd(frames, ref)
         self.df = df
+        if not self.df.empty:
+            self.df.index = self.times(frames)
         self.df.to_csv(self.output)
         if self.verbose:
             print('RMSD calculation complete.')

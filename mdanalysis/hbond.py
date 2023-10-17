@@ -145,6 +145,8 @@ class Hbond(Analysis):
         maxed.index = maxed.columns
         return maxed
 
+    def run_wernet_nilsson(self, selection, **kwargs):
+        pass
 
     
     def bakerHubbard(self, freq, **kwargs):

@@ -149,6 +149,8 @@ class Plotter():
                         kwargs['title'] = titles[i]
                     self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
             self._fix_labels()
+            if show:
+                plt.show()
             return self.axes
         else:
             if ax is None:
