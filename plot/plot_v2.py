@@ -173,10 +173,10 @@ class Plotter():
             plt.tight_layout()
             if out is not None:
                 if out.endswith('png'):
-                    plt.savefig(pdata.saveto, dpi=300)
+                    plt.savefig(out, dpi=300)
                 if out.endswith('svg'):
-                    plt.savefig(pdata.saveto, dpi=300)
-                print('Plotted {}'.format(pdata.saveto))
+                    plt.savefig(out, dpi=300)
+                print('Plotted {}'.format(out))
                 if show is True:
                     plt.show()
             elif show is False:
