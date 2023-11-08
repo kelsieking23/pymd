@@ -112,4 +112,4 @@ class RMSD(Analysis):
     def plot(self, out='rmsd.png', panel=False, ax=None, show=False, titles=[], **kwargs):
         plotter = Plotter()
         out_path = os.path.join(self.root, out)
-        plotter.timeseries(self.df, panel=panel, ax=ax, show=show, titles=titles, **kwargs)
+        plotter.timeseries(self.df, out=out_path, panel=panel, ax=ax, show=show, titles=titles, **kwargs)
