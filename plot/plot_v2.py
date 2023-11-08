@@ -136,7 +136,7 @@ class Plotter():
             pass
         return ax
     
-    def timeseries(self, df, panel=False, ax=None, show=False, titles=[], **kwargs):
+    def timeseries(self, df, out=None, panel=False, ax=None, show=False, titles=[], **kwargs):
         if panel is True:
             if isinstance(df, pd.DataFrame):
                 for (i, col) in enumerate(df.columns):
@@ -171,10 +171,10 @@ class Plotter():
                     ax = self.graph(pdata, ax)
         if panel is False:
             plt.tight_layout()
-            if pdata.saveto is not None:
-                if pdata.saveto.endswith('png'):
+            if out is not None:
+                if out.endswith('png'):
                     plt.savefig(pdata.saveto, dpi=300)
-                if pdata.saveto.endswith('svg'):
+                if out.endswith('svg'):
                     plt.savefig(pdata.saveto, dpi=300)
                 print('Plotted {}'.format(pdata.saveto))
                 if show is True:

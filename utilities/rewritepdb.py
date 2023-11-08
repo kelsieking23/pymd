@@ -73,6 +73,7 @@ def addChainID(filename, newfilename, nterm, cterm):
     # return list of edited contents
     return newfilename
 
+
 def addChainID_CHARMM(inp, out):
     newcontents = []
     f = open(inp, 'r')

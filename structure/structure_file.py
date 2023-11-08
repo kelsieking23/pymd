@@ -18,6 +18,47 @@ class StructureFile:
 
     def get_atom_data_pdb(self, line):
         pass
+    
+    def crd(self, writer=False):
+        atom_index = 0
+        residue_index = -1
+        last_residue = None
+        last_chain = None
+        chain_index = -1
+        chain = 'A'
+        charge = ''
+        box = (0,0,0)
+        model = 1
+        for line in self.structureReader():
+            if (line.startswith('*')) or ('EXT' in line) or (line.strip() == ''):
+                continue
+            else:
+                line_parts = line.strip().split()
+                atom_number = line_parts[0]
+                atom_name = line_parts[3]
+                x = float(line_parts[4])*10
+                y = float(line_parts[5])*10
+                z = float(line_parts[6])*10
+                segid = line_parts[7]
+                residue_name = line_parts[2]
+                residue_number = int(line_parts[1])
+                residue_id = residue_name + residue_name + str(residue_number)
+                if residue_id != last_residue:
+                        residue_index += 1
+                elem = atom_name[0]
+                charge = ''
+                if segid != last_chain:
+                    chain_index += 1
+                    if chain != 'A':
+                        chain = chr(ord(chain) + 1)
+                temp = 0.00
+                occ = 0.00
+                if not writer:
+                    atom = AtomData(atom_number, atom_index, atom_name, residue_name, residue_id, chain, chain_index, residue_number, residue_index, x, y, z, occ, temp, segid, elem, charge, model, box)
+                    yield atom
+                else:
+                    atom = ['ATOM', str(atom_number), atom_name, residue_name, chain, str(residue_number), x, y, z, '1.00', '0.00', segid, elem]
+                    yield atom
 
     def pdb(self):
         atoms = []

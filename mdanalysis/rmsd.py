@@ -9,6 +9,7 @@ from pymd.mdanalysis.analysis import Analysis
 from pymd.utilities.library import residues as canonical
 from pymd.utilities.library import ions as _ion_names
 from pymd.utilities.library import solvent as _solvent_names
+from pymd.plot.plot_v2 import Plotter
 import time
 
 
@@ -107,3 +108,8 @@ class RMSD(Analysis):
                 sele = self.top.select(selstr)
                 selections.append((selstr, self.traj.atom_slice(sele)._xyz))
         return selections
+    
+    def plot(self, out='rmsd.png', panel=False, ax=None, show=False, titles=[], **kwargs):
+        plotter = Plotter()
+        out_path = os.path.join(self.root, out)
+        plotter.timeseries(self.df, panel=panel, ax=ax, show=show, titles=titles, **kwargs)
