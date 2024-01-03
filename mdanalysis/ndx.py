@@ -13,19 +13,38 @@ from argparse import RawTextHelpFormatter
 
 class Ndx:
 
-    def __init__(self, gro, peptides=1, ndxt=None, ligands=None):
+    def __init__(self, gro, peptides=1, types=None, ndxt=None, ligands=None):
         self.gro = gro
+        self.ext = os.path.splitext(self.gro)[1]
         # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
-        self.types = self.getTypes(self.ndxt_groups, ligands)
+
+        if types is None:
+            self.types = self.getTypes(self.ndxt_groups, ligands)
+        else:
+            self.types = types
         # self.topology = Topology(gro)
         # self.types = {}
         # for key in types.keys():
         #     self.types[key] = Type(key, types[key])
         self.selections = {}
+        self.ext = os.path.splitext(self.gro)[1]
 
+
+    @classmethod
+    def from_ndx(cls, ndx_file):
+        types = {}
+        with open(ndx_file, 'r') as f:
+            for line in f:
+                if line.startswith('['):
+                    group = line.strip('[').strip().strip(']').strip()
+                    types[group] = []
+                else:
+                    types[group] = types[group] + line.strip().split()
+        return cls(gro=None, peptides=1, types=types, ndxt=None, ligands=None)
+    
     @property
     def residues(self):
         residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
@@ -93,12 +112,16 @@ class Ndx:
         indeces = {}
         peptide_keys = []
         for key in self.types:
-            if key.startswith('p'):
-                if len(key) == 1:
-                    continue
-                if key[1].isnumeric():
+            if self.ext == 'gro':
+                if key.startswith('p'):
+                    if len(key) == 1:
+                        continue
+                    if key[1].isnumeric():
+                        indeces[key] = self.types[key]
+                        peptide_keys.append(key)
+            else:
+                if key.startswith('chain'):
                     indeces[key] = self.types[key]
-                    peptide_keys.append(key)
         backbone = self.types['backbone']
         for key in peptide_keys:
             indeces['{}_&_backbone'.format(key)] = [atom for atom in indeces[key] if atom in backbone]
@@ -292,6 +315,34 @@ class Ndx:
         for line in contents:
             yield line
     
+    def groParser(line):
+        try:
+            res_id = line[0:10].strip().lower()
+            atom_name = line[8:15].strip().lower()
+            if len(atom_name.split()) == 2:
+                atom_name = atom_name.split()[-1].strip()
+            res_name = line[5:10].strip().lower()
+            res_num = line[:5].strip()
+            atom_num = line[15:20].strip()
+            return res_id, atom_name, res_name, res_num, atom_num, None
+        except:
+            return None, None, None, None, None, None, None
+    
+    def pdbParser(line):
+        try:
+            atom_num = int(line[6:11].strip())
+            atom_name = line[12:16].strip().lower()
+            res_name = line[17:21].strip().lower()
+            chain = line[21].lower()
+            res_num = int(line[22:26].strip())
+            res_id = res_name + str(res_num).lower()
+            if chain == '':
+                segid = line[72:76].strip().lower()
+                if not segid == '':
+                    chain = segid
+            return res_id, atom_name, res_name, res_num, atom_num, chain
+        except:
+            return None, None, None, None, None, None
     def getTypes(self, ndxt_groups=None, ligands=None):
         '''
         Assigns atoms as/by:
@@ -351,6 +402,7 @@ class Ndx:
         }
         i = 0
         k = 0
+        last_chain = None
         if ligands is None:
             ligands = []
         else:
@@ -382,21 +434,27 @@ class Ndx:
         last_atom_name = None
         last_res_name = None
         for line in self.lineGenerator():
-            if i < 2:
-                i += 1
-                continue
+            if self.ext == 'gro':
+                if i < 2:
+                    i += 1
+                    continue
             else:
-                line_parts = line.split()
-                if len(line_parts) <= 3:
-                    break
+                if self.ext == 'pdb':
+                    res_id, atom_name, res_name, res_num, atom_num, chain = self.pdbParser(line)
+                if self.ext == 'gro':
+                    res_id, atom_name, res_name, res_num, atom_num, chain = self.groParser(line) 
+                if res_id is None:
+                    continue
+
+                # line_parts = line.split()
                 
-                res_id = line[0:10].strip().lower()
-                atom_name = line[8:15].strip().lower()
-                if len(atom_name.split()) == 2:
-                    atom_name = atom_name.split()[-1].strip()
-                res_name = line[5:10].strip().lower()
-                res_num = line[:5].strip()
-                atom_num = line[15:20].strip()
+                # res_id = line[0:10].strip().lower()
+                # atom_name = line[8:15].strip().lower()
+                # if len(atom_name.split()) == 2:
+                #     atom_name = atom_name.split()[-1].strip()
+                # res_name = line[5:10].strip().lower()
+                # res_num = line[:5].strip()
+                # atom_num = line[15:20].strip()
                 if atom_num == '0':
                     atom_num = str(atom_index)
                     restarted = True
@@ -594,7 +652,12 @@ class Ndx:
                         types['headgroups'].append(str(int(atom_num) + 1))
                         types['headgroups_noh'].append(atom_num)
 
-
+                # chain
+                if chain is not None:
+                    chainid = 'chain_{}'.format(chain)
+                    if chainid not in types.keys():
+                        types[chainid] = []
+                    types[chainid].append(atom_num)
         # if set_types is True:
         #     self.types = types 
         self.types = types      
@@ -754,6 +817,7 @@ def main():
     # print(args.output)
     # make ndx
     n = Ndx(args.gro, ligands=args.ligands)
+    print(n.ext)
     indeces = {}
     if args.peptide:
         indeces = n.peptides()

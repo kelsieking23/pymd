@@ -224,6 +224,7 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
     last_res_id = None
     last_res_num = None
     chain_id = 'A'
+    _real_chain_id = 'A'
     for i, ld in enumerate(struct.pdb()):
         # write non-atom strings
         if isinstance(ld, str):
@@ -240,9 +241,13 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
 
         if last_res_num is not None:
             if (ld.residue_number != last_res_num + 1) and (ld.residue_number != last_res_num):
-                chain_id = chr(ord(chain_id) + 1)
-                if renumber_chain:
-                    res_counter = start
+                if chain_id != '':
+                    chain_id = chr(ord(chain_id) + 1)
+                    _real_chain_id = chr(ord(_real_chain_id) + 1)
+                    if renumber_chain:
+                        res_counter = start
+                else:
+                    _real_chain_id = chr(ord(_real_chain_id) + 1)
         # check if residue counter > 9999
         if res_counter > 9999:
             res_counter = 0
@@ -255,6 +260,8 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
         if ld.chain_index != last_chain_index:
             res_counter = start
 
+        if ld.residue_name in ['SOL', 'NA', 'CL', 'TIP3', 'CLA', 'SOD', 'POT']:
+            chain_id = ''
         # format and save line for writing
         line_parts = ['ATOM', str(atom_counter), ld.atom_name, ld.residue_name, chain_id, str(res_counter), 
               ld.x, ld.y, ld.z, ld.occ, ld.temp, ld.segid, ld.elem, ld.charge]
@@ -277,7 +284,199 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
     for line in new_contents:
         f.write(line)
     f.close() 
-# def editChainIDLipids(*)
+
+def add_segid(filename, output=None, renumber_chain=True, start=1):
+    struct = StructureFile(filename)
+    new_contents = ['REMARK    CHAIN ID EDITED BY BY pymd.utilities.rewritepdb.editchainID_v2\n']
+    res_counter = start
+    atom_counter = 1
+    last_chain_index = None
+    last_res_id = None
+    last_res_num = None
+    last_res_name = None
+    chain_id = 'A'
+    _real_chain_id = 'A'
+    real_res_counter = 1
+    sol = ['SOL', 'TIP3', 'NA', 'CL', 'K', 'CLA', 'POT', 'SOD']
+    for i, ld in enumerate(struct.pdb()):
+        # write non-atom strings
+        if isinstance(ld, str):
+            new_contents.append(ld)
+            continue
+        
+        # get res id
+        res_id = ld.residue_name + str(ld.residue_number)
+
+        #check for residue change
+        if last_res_id is not None:
+            if last_res_id != res_id:
+                res_counter += 1
+                real_res_counter += 1
+                
+        if last_res_num is not None:
+            if (ld.residue_number != last_res_num + 1) and (ld.residue_number != last_res_num):
+                if not ld.residue_name in ['SOL', 'TIP3', 'NA', 'CL', 'K', 'CLA', 'POT', 'SOD']:
+                    chain_id = chr(ord(chain_id) + 1)
+                    _real_chain_id = chr(ord(_real_chain_id) + 1)
+                    if renumber_chain:
+                        res_counter = start
+                else:
+                    if (last_res_name not in sol) and (ld.residue_name in sol):
+                        chain_id = ''
+            # else:
+            #     if (last_res_name not in sol) and (ld.residue_name in sol):
+            #         chain_id = chr(ord(chain_id) + 1)
+            #         _real_chain_id = chr(ord(_real_chain_id) + 1)
+            #     elif (ld.residue_name in sol):
+            #         if last_res_name != ld.residue_name:
+            #             chain_id = chr(ord(chain_id) + 1)
+
+
+        # check if residue counter > 9999
+        if res_counter > 9999:
+            res_counter = 0
+
+        # check if atom_counter > 99999
+        if atom_counter > 99999:
+            atom_counter = 0
+
+        # check chain index
+        if ld.chain_index != last_chain_index:
+            res_counter = start
+
+        if ld.residue_name in ['SOL', 'TIP3']:
+            segid = 'SOLV'
+        elif ld.residue_name in ['NA', 'CL', 'K', 'CLA', 'POT', 'SOD']:
+            segid = 'SOLV'
+        else:
+            segid = 'PRO{}'.format(chain_id)
+        # format and save line for writing
+        line_parts = ['ATOM', str(atom_counter), ld.atom_name, ld.residue_name, chain_id, str(res_counter), 
+              ld.x, ld.y, ld.z, ld.occ, ld.temp, segid, ld.elem, ld.charge]
+        if len(ld.atom_name) > 3:
+            line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        else:
+            line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        new_contents.append(line)
+
+        # update last data
+        last_chain_index = ld.chain_index
+        last_res_id = res_id
+        last_res_num = ld.residue_number
+        last_res_name = ld.residue_name
+        atom_counter += 1
+
+    # write file
+    if output is None:
+        output = filename
+    f = open(output, 'w')
+    for line in new_contents:
+        f.write(line)
+    f.close() 
+
+def solv2CHARMM(filename, output=None, renumber_chain=True, start=1):
+    struct = StructureFile(filename)
+    new_contents = ['REMARK    CHAIN ID EDITED BY BY pymd.utilities.rewritepdb.editchainID_v2\n']
+    res_counter = start
+    atom_counter = 1
+    last_chain_index = None
+    last_res_id = None
+    last_res_num = None
+    last_res_name = None
+    chain_id = 'A'
+    _real_chain_id = 'A'
+    real_res_counter = 1
+    sol = ['SOL', 'TIP3', 'NA', 'CL', 'K', 'CLA', 'POT', 'SOD']
+    for i, ld in enumerate(struct.pdb()):
+        # write non-atom strings
+        if isinstance(ld, str):
+            new_contents.append(ld)
+            continue
+        
+        # get res id
+        res_id = ld.residue_name + str(ld.residue_number)
+
+        # #check for residue change
+        # if last_res_id is not None:
+        #     if last_res_id != res_id:
+        #         res_counter += 1
+        #         real_res_counter += 1
+                
+        # if last_res_num is not None:
+        #     if (ld.residue_number != last_res_num + 1) and (ld.residue_number != last_res_num):
+        #         if not ld.residue_name in ['SOL', 'TIP3', 'NA', 'CL', 'K', 'CLA', 'POT', 'SOD']:
+        #             chain_id = chr(ord(chain_id) + 1)
+        #             _real_chain_id = chr(ord(_real_chain_id) + 1)
+        #             if renumber_chain:
+        #                 res_counter = start
+        #         else:
+        #             chain_id = ''
+
+
+        # # check if residue counter > 9999
+        # if res_counter > 9999:
+        #     res_counter = 0
+
+        # # check if atom_counter > 99999
+        # if atom_counter > 99999:
+        #     atom_counter = 0
+
+        # # check chain index
+        # if ld.chain_index != last_chain_index:
+        #     res_counter = start
+
+        if ld.residue_name in ['SOL', 'TIP3']:
+            segid = 'SOLV'
+            res_name = 'TIP3'
+            if ld.elem == 'OW':
+                atom_name = 'OH2'
+            elif ld.atom_name == 'HW1':
+                atom_name = 'H1'
+            elif ld.atom_name == 'HW2':
+                atom_name = 'H2'
+            
+        elif ld.residue_name in ['NA', 'CL', 'K', 'CLA', 'POT', 'SOD']:
+            segid = 'IONS'
+            if (ld.residue_name == 'NA') or (ld.residue_name == 'SOD'):
+                res_name = 'SOD'
+                atom_name = 'SOD'
+                ld.elem = 'Na'
+            if (ld.residue_name == 'K') or (ld.residue_name == 'POT'):
+                res_name = 'POT'
+                atom_name = 'POT'
+                ld.elem ='K'
+            if (ld.residue_name == 'CL') or (ld.residue_name == 'CLA'):
+                res_name = 'CLA'
+                atom_name = 'CLA'
+                ld.elem='Cl'
+        else:
+            segid = 'PRO{}'.format(chain_id)
+            res_name = ld.residue_name
+            atom_name = ld.atom_name
+        # format and save line for writing
+        line_parts = ['ATOM', str(atom_counter), atom_name, res_name, chain_id, str(res_counter), 
+              ld.x, ld.y, ld.z, ld.occ, ld.temp, segid, ld.elem, ld.charge]
+        if len(ld.atom_name) > 3:
+            line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        else:
+            line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        new_contents.append(line)
+
+        # # update last data
+        # last_chain_index = ld.chain_index
+        # last_res_id = res_id
+        # last_res_num = ld.residue_number
+        # last_res_name = ld.residue_name
+        # atom_counter += 1
+
+    # write file
+    if output is None:
+        output = filename
+    f = open(output, 'w')
+    for line in new_contents:
+        f.write(line)
+    f.close() 
+
 def editChainID(filename, *args, output=None, renumber_chains=False, chain_id='A'):
     '''
     edits chain id by given residue ranges (tuples)

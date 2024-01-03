@@ -119,7 +119,7 @@ class StructureFile:
                 pass
             else:
                 yield line
-        # return atoms
+        return atoms
 
     def gro(self):
         return []
@@ -154,5 +154,4 @@ class AtomData:
     charge:str
     model: float
     box: tuple
-
 

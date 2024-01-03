@@ -109,7 +109,13 @@ class RMSD(Analysis):
                 selections.append((selstr, self.traj.atom_slice(sele)._xyz))
         return selections
     
-    def plot(self, out='rmsd.png', panel=False, ax=None, show=False, titles=[], **kwargs):
+    def plot(self, out='rmsd.png', panel=False, ax=None, show=False, titles=[], units='ns', **kwargs):
         plotter = Plotter()
+        if units == 'ns':
+            self.df.index = [i/1000 for i in self.df.index]
+        if 'x_label' not in kwargs.keys():
+            kwargs['x_label'] = 'Time ({})'.format(units)
+        if 'y_label' not in kwargs.keys():
+            kwargs['y_label'] = 'RMSD (nm)'
         out_path = os.path.join(self.root, out)
         plotter.timeseries(self.df, out=out_path, panel=panel, ax=ax, show=show, titles=titles, **kwargs)

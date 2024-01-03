@@ -149,6 +149,13 @@ class Plotter():
                         kwargs['title'] = titles[i]
                     self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
             self._fix_labels()
+            plt.tight_layout()
+            if out is not None:
+                if out.endswith('png'):
+                    plt.savefig(out, dpi=300)
+                if out.endswith('svg'):
+                    plt.savefig(out, dpi=300)
+                print('Plotted {}'.format(out))
             if show:
                 plt.show()
             return self.axes

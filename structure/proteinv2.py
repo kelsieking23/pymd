@@ -61,6 +61,9 @@ class Protein:
             if last_atom is None:
                 res_data.append(atom)
             else:
+                if (isinstance(last_atom, str)):
+                    print(last_atom)
+                    continue
                 if last_atom.residue_id != atom.residue_id:
                     res = Residue(res_data)
                     residues.append(res)

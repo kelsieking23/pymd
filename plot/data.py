@@ -340,7 +340,7 @@ class PlotData:
         if ymax is None:
             ymax = _ymax
         fig = None
-        xticks = ElementParam(xmin=xmin-xpad, xmax=xmax+xpad, fonlocs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, labels=xtick_labels,
+        xticks = ElementParam(xmin=xmin-xpad, xmax=xmax+xpad, locs=major_xticks, fontsize=tick_label_fontsize, minor_locs=minor_xticks, labels=xtick_labels,
                             xtick_label_rotation=xtick_label_rotation)
         
         yticks = ElementParam(ymin=ymin, ymax=ymax, locs=major_yticks, fontsize=tick_label_fontsize, minor_locs=minor_yticks)
