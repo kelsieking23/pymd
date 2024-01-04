@@ -158,6 +158,7 @@ class Analysis:
             os.mkdir(root)
         return root
 
+
     def loadTrajectory(self, stride=100, selection='backbone', b=0, e=-1):
         if self.verbose:
             print('Loading {}...'.format(self.inp))
@@ -283,10 +284,14 @@ class Analysis:
                 break
         return partitions, nprocs
 
-    def toPDB(self, index, output, full_traj=False, renumber=False, remark=None):
+    def toPDB(self, output, index=0, time=None, full_traj=False, renumber=False, remark=None):
         if full_traj:
+            if time is not None:
+                index = list(self._traj._time).index(time)
             frame = self._traj._xyz[index]
         else:
+            if time is not None:
+                index = list(self.traj._time).index(time)
             frame = self.traj._xyz[index]
         chain_index = 0
         chain_id = 'A'
@@ -309,7 +314,9 @@ class Analysis:
             else:
                 res_num = str(atom.residue.resSeq)
             x, y, z = map(self.fixCoordinates, frame[z])
-            line = ['ATOM', str(atom.index), atom.name, atom.residue.name, chain_id, res_num, x, y, z, '1.00', '0.00', atom.element.symbol, atom.residue.segment_id]
+            if (atom.residue.segment_id is None) or (atom.residue.segment_id == ''):
+                atom.residue.segment_id = '    '
+            line = ['ATOM', str(atom.index+1), atom.name, atom.residue.name, chain_id, res_num, x, y, z, '1.00', '0.00', atom.residue.segment_id, atom.element.symbol]
             contents.append(line)
         writePDB(contents, output)
         print('Wrote {}'.format(output))

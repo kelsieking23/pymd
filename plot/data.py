@@ -1320,7 +1320,11 @@ class PlotData:
         return cls('heatmap',data, fig, xticks, yticks, xlabel, ylabel, title, axes, legend, annotations, saveto)
     
     @classmethod
-    def bar(cls, df, x='default', width=1, tick_label=None, color='#9bcccc', alpha=1, title=None, xlabel=None, title_fontsize=20, title_weight='bold', tick_label_fontsize=14, label_fontsize=16, weight='bold', ylabel=None, ymin=0, ymax=None, xmin=None, xmax=None, locs=20, minor_locs=5, xlim=None, capsize=1, capthick=0, elinewidth=1, ecolor=None, orientation='vertical', annotations=True, std=pd.DataFrame(), output=None, bar_labels=None, bar_padding=3, bar_fmt='', bar_fontsize=12):
+    def bar(cls, df, x='default', width=1, tick_label=None, color='tab:blue', alpha=1, title=None, x_label=None, 
+            title_fontsize=20, title_weight='bold', tick_label_fontsize=14, label_fontsize=16, weight='bold', y_label=None, 
+            ymin=None, ymax=None, xmin=None, xmax=None, locs=None, minor_locs=None, xlim=None, capsize=1, capthick=0, elinewidth=1, 
+            ecolor=None, orientation='vertical', annotations=True, std=pd.DataFrame(), output=None, bar_labels=None, bar_padding=3, bar_fmt='', bar_fontsize=12,
+            rotation=0):
         if x == 'default':
             x = [i for i in range(len(df.index))]
         elif x == 'index':
@@ -1347,35 +1351,39 @@ class PlotData:
             err = None
         else:
             err = np.reshape(std.values, -1)
+        if tick_label is None:
+            tick_label = x
         data = [Data(df=df, x=x, values=values, color=color, tick_label=tick_label, width=width, err=err, error_kw=error_kw, orientation=orientation, alpha=alpha)]
 
-        if xmin is None:
-            xmin = min(x)
-        if xmax is None:
-            xmax = max(x)
-        if ymin is None:
-            ymin = min(values)
-        if ymax is None:
-            ymin = max(values)
+
 
         if orientation == 'vertical':
             _xlocs = None
             _xlocs_minor = None
             _ylocs = locs
             _ylocs_minor = minor_locs
+            xtick_label_rotation = rotation
+            ytick_label_rotation = 0
+            ytick_label=None
+            xtick_label = tick_label
         else:
             _xlocs = locs
             _xlocs_minor = minor_locs
             _ylocs = None
             _ylocs_minor = None
-        xticks = ElementParam(labels=tick_label, locs=_xlocs, minor_locs=_xlocs_minor, fontsize=tick_label_fontsize, xmin=xmin,xmax=xmax)
+            xtick_label_rotation=rotation
+            ytick_label_rotation = 0
+            ytick_label=None
+            xtick_label = tick_label
+        print(ymin)
+        xticks = ElementParam(labels=xtick_label, locs=_xlocs, minor_locs=_xlocs_minor, fontsize=tick_label_fontsize, xmin=xmin,xmax=xmax, xtick_label_rotation=xtick_label_rotation)
     
-        yticks = ElementParam(labels=tick_label, ymin=ymin, ymax=ymax, locs=_ylocs, minor_locs=_ylocs_minor, fontsize=tick_label_fontsize)   
+        yticks = ElementParam(labels=ytick_label, ymin=ymin, ymax=ymax, locs=_ylocs, minor_locs=_ylocs_minor, fontsize=tick_label_fontsize, ytick_label_rotation=ytick_label_rotation)   
 
         fig = None
 
-        xlabel = ElementParam(label=xlabel, fontsize=label_fontsize, weight=weight)
-        ylabel = ElementParam(label=ylabel, fontsize=label_fontsize, weight=weight)
+        xlabel = ElementParam(label=x_label, fontsize=label_fontsize, weight=weight)
+        ylabel = ElementParam(label=y_label, fontsize=label_fontsize, weight=weight)
 
         if title is not None:
             title = ElementParam(title=title, fontsize=title_fontsize, weight=title_weight)
