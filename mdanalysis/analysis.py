@@ -108,6 +108,7 @@ class Analysis:
         else:
             inp = params['_inp']
             top = params['_topfile']
+        dic['_top'] = mdtraj.load(params['_topfile']).topology
         if load_traj:
             stride = dic['stride']
             selection = dic['selection']
