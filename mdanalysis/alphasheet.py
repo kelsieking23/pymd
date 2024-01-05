@@ -183,7 +183,7 @@ class AlphaSheet(Analysis):
         return pd.Series(data=counts.values(), index=counts.keys())
             
     def plot(self, output='alphasheet.png', show=False, aggregate_chains=False, w=10, h=6, 
-             x_label='Residue', y_label=r'$\alpha$-Sheet Count', **kwargs):
+             x_label='Residue', y_label=r'$\alpha$-Strand Count (Frames)', **kwargs):
         plotter = Plotter(w=w, h=h)
         df = self.get_plot_data(aggregate_chains)
         if 'tick_label' not in kwargs.keys():
