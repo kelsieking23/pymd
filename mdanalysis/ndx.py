@@ -15,7 +15,8 @@ class Ndx:
 
     def __init__(self, gro, peptides=1, types=None, ndxt=None, ligands=None):
         self.gro = gro
-        self.ext = os.path.splitext(self.gro)[1]
+        self.ext = os.path.splitext(self.gro)[1][1:]
+        print(self.ext)
         # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
@@ -315,7 +316,7 @@ class Ndx:
         for line in contents:
             yield line
     
-    def groParser(line):
+    def groParser(self, line):
         try:
             res_id = line[0:10].strip().lower()
             atom_name = line[8:15].strip().lower()
@@ -328,7 +329,7 @@ class Ndx:
         except:
             return None, None, None, None, None, None, None
     
-    def pdbParser(line):
+    def pdbParser(self, line):
         try:
             atom_num = int(line[6:11].strip())
             atom_name = line[12:16].strip().lower()
@@ -434,230 +435,225 @@ class Ndx:
         last_atom_name = None
         last_res_name = None
         for line in self.lineGenerator():
+            if self.ext == 'pdb':
+                res_id, atom_name, res_name, res_num, atom_num, chain = self.pdbParser(line)
             if self.ext == 'gro':
-                if i < 2:
-                    i += 1
-                    continue
+                res_id, atom_name, res_name, res_num, atom_num, chain = self.groParser(line) 
+            if res_id is None:
+                continue
+
+            # line_parts = line.split()
+            
+            # res_id = line[0:10].strip().lower()
+            # atom_name = line[8:15].strip().lower()
+            # if len(atom_name.split()) == 2:
+            #     atom_name = atom_name.split()[-1].strip()
+            # res_name = line[5:10].strip().lower()
+            # res_num = line[:5].strip()
+            # atom_num = line[15:20].strip()
+            if atom_num == '0':
+                atom_num = str(atom_index)
+                restarted = True
+                atom_index += 1
+            elif restarted is True:
+                atom_num = str(atom_index)
+                atom_index += 1
             else:
-                if self.ext == 'pdb':
-                    res_id, atom_name, res_name, res_num, atom_num, chain = self.pdbParser(line)
-                if self.ext == 'gro':
-                    res_id, atom_name, res_name, res_num, atom_num, chain = self.groParser(line) 
-                if res_id is None:
-                    continue
-
-                # line_parts = line.split()
-                
-                # res_id = line[0:10].strip().lower()
-                # atom_name = line[8:15].strip().lower()
-                # if len(atom_name.split()) == 2:
-                #     atom_name = atom_name.split()[-1].strip()
-                # res_name = line[5:10].strip().lower()
-                # res_num = line[:5].strip()
-                # atom_num = line[15:20].strip()
-                if atom_num == '0':
-                    atom_num = str(atom_index)
-                    restarted = True
-                    atom_index += 1
-                elif restarted is True:
-                    atom_num = str(atom_index)
-                    atom_index += 1
+                pass
+            types['system'].append(atom_num)
+            # atom types
+            if 'o' in atom_name:
+                types['o'].append(atom_num)
+            if 'n' in atom_name:
+                types['n'].append(atom_num)
+            if 'h' in atom_name:
+                types['h'].append(atom_num)
+            if 'c' in atom_name:
+                types['c'].append(atom_num)
+            if 'p' in atom_name:
+                types['p'].append(atom_num)
+            if 's' in atom_name:
+                types['s'].append(atom_num)
+            if atom_name not in types.keys():
+                types[atom_name] = [atom_num]
+            else:
+                types[atom_name].append(atom_num)
+            # res id 
+            if res_name not in solvent:
+                if res_id not in list(types.keys()):
+                    types[res_id] = []
+                    types[res_id].append(atom_num)
                 else:
-                    pass
-                types['system'].append(atom_num)
-                # atom types
-                if 'o' in atom_name:
-                    types['o'].append(atom_num)
-                if 'n' in atom_name:
-                    types['n'].append(atom_num)
-                if 'h' in atom_name:
-                    types['h'].append(atom_num)
-                if 'c' in atom_name:
-                    types['c'].append(atom_num)
-                if 'p' in atom_name:
-                    types['p'].append(atom_num)
-                if 's' in atom_name:
-                    types['s'].append(atom_num)
-                if atom_name not in types.keys():
-                    types[atom_name] = [atom_num]
+                    types[res_id].append(atom_num)
+            if res_name in residues:
+                # protein atoms
+                types['protein'].append(atom_num)
+                types['protein_caps'].append(atom_num)
+
+                # # backbone
+                # if atom_name in backbone:
+                #     types['backbone'].append(atom_num)
+                #     types['backbone_nocaps'].append(atom_num)
+
+                # # mainchain
+                # if atom_name in mainchain:
+                #     types['mainchain'].append(atom_num)
+                #     types['mainchain_nocaps'].append(atom_num)
+                #     types['mainchain_h'].append(atom_num)
+                #     types['mainchain_h_nocaps'].append(atom_num)
+
+                # backbone
+                if atom_name in backbone:
+                    types['backbone'].append(atom_num)
+                    types['backbone_nocaps'].append(atom_num)
+                if atom_name in mainchain:
+                    types['mainchain'].append(atom_num)
+                    types['mainchain_nocaps'].append(atom_num)
+                    types['mainchain_h'].append(atom_num)
+                    types['mainchain_h_nocaps'].append(atom_num)
+                if (atom_name not in mainchain) and (atom_name not in backbone):
+                    types['sidechain'].append(atom_num)
+
+                # residue index
+                if last_res_id != res_id:
+                    k += 1
+                    ri = 'ri{}'.format(str(k))
+                    types[ri] = []
+                    types[ri].append(atom_num)
                 else:
-                    types[atom_name].append(atom_num)
-                # res id 
-                if res_name not in solvent:
-                    if res_id not in list(types.keys()):
-                        types[res_id] = []
-                        types[res_id].append(atom_num)
+                    types[ri].append(atom_num)
+
+                # res name
+                if res_name not in list(types.keys()):
+                    types[res_name] = []
+                    types[res_name].append(atom_num)
+                else:
+                    types[res_name].append(atom_num)
+
+                # peptide
+                if self.peptides is not None:
+                    if last_res_id is None:
+                            peptides += 1
+                            pi = 'p{}'.format(str(peptides))
+                            types[pi] = []
+                            types[pi].append(atom_num)
                     else:
-                        types[res_id].append(atom_num)
-                if res_name in residues:
-                    # protein atoms
-                    types['protein'].append(atom_num)
-                    types['protein_caps'].append(atom_num)
-
-                    # # backbone
-                    # if atom_name in backbone:
-                    #     types['backbone'].append(atom_num)
-                    #     types['backbone_nocaps'].append(atom_num)
-
-                    # # mainchain
-                    # if atom_name in mainchain:
-                    #     types['mainchain'].append(atom_num)
-                    #     types['mainchain_nocaps'].append(atom_num)
-                    #     types['mainchain_h'].append(atom_num)
-                    #     types['mainchain_h_nocaps'].append(atom_num)
-
-                    # backbone
-                    if atom_name in backbone:
-                        types['backbone'].append(atom_num)
-                        types['backbone_nocaps'].append(atom_num)
-                    if atom_name in mainchain:
-                        types['mainchain'].append(atom_num)
-                        types['mainchain_nocaps'].append(atom_num)
-                        types['mainchain_h'].append(atom_num)
-                        types['mainchain_h_nocaps'].append(atom_num)
-                    if (atom_name not in mainchain) and (atom_name not in backbone):
-                        types['sidechain'].append(atom_num)
-
-                    # residue index
-                    if last_res_id != res_id:
-                        k += 1
-                        ri = 'ri{}'.format(str(k))
-                        types[ri] = []
-                        types[ri].append(atom_num)
-                    else:
-                        types[ri].append(atom_num)
-
-                    # res name
-                    if res_name not in list(types.keys()):
-                        types[res_name] = []
-                        types[res_name].append(atom_num)
-                    else:
-                        types[res_name].append(atom_num)
-
-                    # peptide
-                    if self.peptides is not None:
-                        if last_res_id is None:
+                        if last_res_id != res_id:
+                            if int(res_num) != int(last_res_num) + 1:
                                 peptides += 1
                                 pi = 'p{}'.format(str(peptides))
                                 types[pi] = []
                                 types[pi].append(atom_num)
-                        else:
-                            if last_res_id != res_id:
-                                if int(res_num) != int(last_res_num) + 1:
-                                    peptides += 1
-                                    pi = 'p{}'.format(str(peptides))
-                                    types[pi] = []
-                                    types[pi].append(atom_num)
-                                else:
-                                    types[pi].append(atom_num)
                             else:
                                 types[pi].append(atom_num)
-                            ### This commended out block works for peptides with repeating residue numbers.
-                            ### for example the abeta systems 
-                            # if res_id == visited_residues[0]:
-                            #     if res_id != last_res_id:
-                            #         peptides += 1
-                            #         pi = 'p{}'.format(str(peptides))
-                            #         types[pi] = []
-                            #         types[pi].append(atom_num)
-                            #     else:
-                            #         types[pi].append(atom_num)
-                            # else:
-                            #     types[pi].append(atom_num)
-                    if res_id not in visited_residues:
-                        visited_residues.append(res_id)
-                    last_res_id = res_id
-                    last_res_num = res_num
+                        else:
+                            types[pi].append(atom_num)
+                        ### This commended out block works for peptides with repeating residue numbers.
+                        ### for example the abeta systems 
+                        # if res_id == visited_residues[0]:
+                        #     if res_id != last_res_id:
+                        #         peptides += 1
+                        #         pi = 'p{}'.format(str(peptides))
+                        #         types[pi] = []
+                        #         types[pi].append(atom_num)
+                        #     else:
+                        #         types[pi].append(atom_num)
+                        # else:
+                        #     types[pi].append(atom_num)
+                if res_id not in visited_residues:
+                    visited_residues.append(res_id)
+                last_res_id = res_id
+                last_res_num = res_num
 
-                # caps
-                elif res_name in caps:
-                    types['protein_caps'].append(atom_num)
-                    types['caps'].append(atom_num)
-                    if atom_name in backbone:
-                        types['backbone'].append(atom_num)
-                    if atom_name in mainchain:
-                        types['mainchain'].append(atom_num)
-                    if 'H' in atom_name:
-                        types['mainchain_h'].append(atom_num)
-                    if res_id not in types.keys():
-                        types[res_id] = []
-                        types[res_id].append(atom_num)
-                    else:
-                        types[res_id].append(atom_num)
-                # lipids
-                elif res_name in lipids:
-                    types['lipids'].append(atom_num)
-                    if res_name not in types.keys():
-                        types[res_name] = [atom_num]
-                    else:
-                        types[res_name].append(atom_num)
-                # ganglioside
-                elif res_name in gangliosides:
-                    types['gangliosides'].append(atom_num)
-                    if res_name not in types.keys():
-                        types[res_name] = [atom_num]
-                    else:
-                        types[res_name].append(atom_num)
-                # ions
-                elif res_name in ions:
-                    types['ions'].append(atom_num)
-                # solvent
-                elif res_name in solvent:
-                    types['solvent'].append(atom_num)
-                    # break
-                # ligands
-                elif res_name in ligands:
-                    types[res_name].append(atom_num)
-                    if res_id not in list(types.keys()):
-                        types[res_id] = []
-                        types[res_id].append(atom_num)
-                    else:
-                        types[res_id].append(atom_num)
-                # other non protein
+            # caps
+            elif res_name in caps:
+                types['protein_caps'].append(atom_num)
+                types['caps'].append(atom_num)
+                if atom_name in backbone:
+                    types['backbone'].append(atom_num)
+                if atom_name in mainchain:
+                    types['mainchain'].append(atom_num)
+                if 'H' in atom_name:
+                    types['mainchain_h'].append(atom_num)
+                if res_id not in types.keys():
+                    types[res_id] = []
+                    types[res_id].append(atom_num)
                 else:
-                    types['nonprotein'].append(atom_num)
-                    if res_name not in list(types.keys()):
-                        types[res_name] = []
-                        types[res_name].append(atom_num)
-                    else:
-                        types[res_name].append(atom_num)
-                # ndxt groups
-                if ndxt_groups is not None:
-                    for key in ndxt_groups.keys():
-                        if atom_name in ndxt_groups[key]:
-                            if atom_num not in types[key]:
-                                types[key].append(atom_num)
-                        if atom_num in ndxt_groups[key]:
-                            if atom_num not in types[key]:
-                                types[key].append(atom_num)
-                # drude particles
-                if (atom_name.startswith('D')) or (atom_name.startswith('LP')):
-                    types['drude_particles'].append(atom_num)
+                    types[res_id].append(atom_num)
+            # lipids
+            elif res_name in lipids:
+                types['lipids'].append(atom_num)
+                if res_name not in types.keys():
+                    types[res_name] = [atom_num]
+                else:
+                    types[res_name].append(atom_num)
+            # ganglioside
+            elif res_name in gangliosides:
+                types['gangliosides'].append(atom_num)
+                if res_name not in types.keys():
+                    types[res_name] = [atom_num]
+                else:
+                    types[res_name].append(atom_num)
+            # ions
+            elif res_name in ions:
+                types['ions'].append(atom_num)
+            # solvent
+            elif res_name in solvent:
+                types['solvent'].append(atom_num)
+                # break
+            # ligands
+            elif res_name in ligands:
+                types[res_name].append(atom_num)
+                if res_id not in list(types.keys()):
+                    types[res_id] = []
+                    types[res_id].append(atom_num)
+                else:
+                    types[res_id].append(atom_num)
+            # other non protein
+            else:
+                types['nonprotein'].append(atom_num)
+                if res_name not in list(types.keys()):
+                    types[res_name] = []
+                    types[res_name].append(atom_num)
+                else:
+                    types[res_name].append(atom_num)
+            # ndxt groups
+            if ndxt_groups is not None:
+                for key in ndxt_groups.keys():
+                    if atom_name in ndxt_groups[key]:
+                        if atom_num not in types[key]:
+                            types[key].append(atom_num)
+                    if atom_num in ndxt_groups[key]:
+                        if atom_num not in types[key]:
+                            types[key].append(atom_num)
+            # drude particles
+            if (atom_name.startswith('D')) or (atom_name.startswith('LP')):
+                types['drude_particles'].append(atom_num)
 
-                # lipid headgroups:
-                if (atom_name.startswith('P')) and (res_name in lipids):
+            # lipid headgroups:
+            if (atom_name.startswith('P')) and (res_name in lipids):
+                types['headgroups'].append(atom_num)
+                types['headgroups'].append(str(int(atom_num) - 1))
+                types['headgroups'].append(str(int(atom_num) + 1))
+                types['headgroups'].append(str(int(atom_num) + 2))
+                types['headgroups'].append(str(int(atom_num) + 3))
+                types['headgroups_noh'].append(atom_num)
+                types['headgroups_noh'].append(str(int(atom_num) - 1))
+                types['headgroups_noh'].append(str(int(atom_num) + 1))
+                types['headgroups_noh'].append(str(int(atom_num) + 2))
+                types['headgroups_noh'].append(str(int(atom_num) + 3))
+            if (res_name == 'CHOL'):
+                if ('O' in atom_name):
                     types['headgroups'].append(atom_num)
-                    types['headgroups'].append(str(int(atom_num) - 1))
                     types['headgroups'].append(str(int(atom_num) + 1))
-                    types['headgroups'].append(str(int(atom_num) + 2))
-                    types['headgroups'].append(str(int(atom_num) + 3))
                     types['headgroups_noh'].append(atom_num)
-                    types['headgroups_noh'].append(str(int(atom_num) - 1))
-                    types['headgroups_noh'].append(str(int(atom_num) + 1))
-                    types['headgroups_noh'].append(str(int(atom_num) + 2))
-                    types['headgroups_noh'].append(str(int(atom_num) + 3))
-                if (res_name == 'CHOL'):
-                    if ('O' in atom_name):
-                        types['headgroups'].append(atom_num)
-                        types['headgroups'].append(str(int(atom_num) + 1))
-                        types['headgroups_noh'].append(atom_num)
 
-                # chain
-                if chain is not None:
-                    chainid = 'chain_{}'.format(chain)
-                    if chainid not in types.keys():
-                        types[chainid] = []
-                    types[chainid].append(atom_num)
+            # chain
+            if chain is not None:
+                chainid = 'chain_{}'.format(chain)
+                if chainid not in types.keys():
+                    types[chainid] = []
+                types[chainid].append(atom_num)
         # if set_types is True:
         #     self.types = types 
         self.types = types      
