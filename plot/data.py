@@ -217,7 +217,7 @@ class PlotData:
                         d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, fill_between=std_df['std'], alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
                     except:
                         if i == 0:
-                            print('WARNING: average must be True for standard deviation to plot. Plotting dataframe containing the following files individually: \n {}'.format(df.name))
+                            print('WARNING: average must be True for standard deviation to plot. Plotting dataframe individually')
                         d = Data(df=df, x=df.index, y=df[column], color=color, label=label, linewidth=linewidth, alpha=alpha, scatter=scatter, marker=marker, s=s, linestyle=linestyle)
             data.append(d)
 

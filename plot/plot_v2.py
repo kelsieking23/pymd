@@ -136,10 +136,12 @@ class Plotter():
             pass
         return ax
     
-    def timeseries(self, df, out=None, panel=False, ax=None, show=False, titles=[], **kwargs):
+    def timeseries(self, df, out=None, panel=False, ax=None, show=False, titles=[], suptitle=None, **kwargs):
         if panel is True:
             if isinstance(df, pd.DataFrame):
                 for (i, col) in enumerate(df.columns):
+                    if titles != []:
+                        kwargs['title'] = titles[i]
                     data = pd.DataFrame()
                     data[col] = df[col]
                     self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
@@ -149,6 +151,8 @@ class Plotter():
                         kwargs['title'] = titles[i]
                     self.axes.flat[i] = self.timeseries(data, panel=False, ax=self.axes.flat[i], **kwargs)
             self._fix_labels()
+            if suptitle is not None:
+                plt.suptitle(suptitle, weight='bold', fontsize=18)
             plt.tight_layout()
             if out is not None:
                 if out.endswith('png'):
@@ -234,13 +238,24 @@ class Plotter():
                 plt.close()
         return ax
 
-    def histogram(self, df, panel=False, show=True, ax=None, **kwargs):
+    def histogram(self, df, out=None, panel=False, show=True, ax=None, suptitle=None, **kwargs):
         if panel is True:
             for (i, col) in enumerate(df.columns):
                 data = pd.DataFrame()
                 data[col] = df[col]
                 self.axes.flat[i] = self.histogram(data, panel=False, ax=self.axes.flat[i], **kwargs)
             self._fix_labels()
+            if suptitle is not None:
+                plt.suptitle(suptitle, weight='bold', fontsize=18)
+            plt.tight_layout()
+            if out is not None:
+                if out.endswith('png'):
+                    plt.savefig(out, dpi=300)
+                if out.endswith('svg'):
+                    plt.savefig(out, dpi=300)
+                print('Plotted {}'.format(out))
+            if show:
+                plt.show()
             return self.axes
         else:
             if ax is None:
@@ -250,6 +265,8 @@ class Plotter():
             for d in pdata.data:
                 ax.hist(d.x, bins=d.bins, density=d.density, alpha=d.alpha, color=d.color, label=d.label)
                 ax = self.graph(pdata, ax)
+            if suptitle is not None:
+                plt.suptitle(suptitle, weight='bold', fontsize=18)
             plt.tight_layout()
             if pdata.saveto is not None:
                 if pdata.saveto.endswith('png'):

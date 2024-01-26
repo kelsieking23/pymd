@@ -67,6 +67,7 @@ class Analysis:
     @property
     def protein_atoms(self):
         return np.array([self.top.atom(idx) for idx in self.protein_idx])
+
     
     def save(self, **kwargs):
         params = {}
@@ -284,6 +285,10 @@ class Analysis:
                 partitions.append(data)
                 break
         return partitions, nprocs
+
+    def unique(self, sele):
+        pass
+
 
     def toPDB(self, output, index=0, time=None, full_traj=False, renumber=False, remark=None):
         if full_traj:

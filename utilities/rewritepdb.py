@@ -821,6 +821,8 @@ def writePDB(data, newfilename):
             f.write(string)
             # break
         elif (line[0] == 'ATOM') or (line[0] == 'HETATM'):
+            if not line[1].isnumeric():
+                continue
             atom_name = line[2]
             atom_symbol = line[2][0]
             res_name = line[3]

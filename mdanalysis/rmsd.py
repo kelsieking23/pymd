@@ -70,12 +70,13 @@ class RMSD(Analysis):
                 print('Starting RMSD calculation, by ({}) using selection ({})'.format(by, selection))
             else:
                 print('Starting RMSD calculation, by ({}) using selection(s) ({})'.format(by, ', '.join(selection)))
-        selections = self.by_selection(by, selection)
+        selections = self.by_selection(by, selection, ref_idx)
         df = pd.DataFrame()
-        for selstr, frames in selections:
+        for selstr, trj, ref in selections:
+            frames = trj._xyz
             if self.verbose:
                 print('Running for: {}'.format(selstr))
-            ref = frames[ref_idx]
+            ref = ref._xyz
             df_column = '_'.join(selstr.split())
             df[df_column] = self.rmsd(frames, ref)
         self.df = df
