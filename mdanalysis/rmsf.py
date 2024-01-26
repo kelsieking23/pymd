@@ -127,7 +127,7 @@ class RMSF(Analysis):
         if 'std' not in kwargs.keys():
             kwargs['std'] = True
         idx = []
-        for i, item in enumerate(self.df.groupby([average_by]).mean().index):
+        for i, item in enumerate(df.groupby([average_by]).mean().index):
             try:
                 idx.append(int(item))
             except:
