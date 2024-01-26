@@ -112,11 +112,11 @@ class RMSF(Analysis):
 
     def plot(self, output='rmsf.png', average_by=None, plot_by=None, panel=False, nrows=1, ncols=1, w=8, h=6, suptitle='RMSF', titles=[], ax=None, show=False, **kwargs):
         if average_by is not None:
-            self.plot_average(output, average_by, show, w, h, title=suptitle, **kwargs)
+            self.plot_average(output, average_by, show, w, h, **kwargs)
         elif plot_by is not None:
             self.plot_by(output, plot_by, show, panel, nrows, ncols, w, h, titles, **kwargs)
         else:
-            self.plot_single(output, show, w, h, title=suptitle, **kwargs)
+            self.plot_single(output, show, w, h, **kwargs)
 
     def plot_average(self, output, average_by, show, w, h, **kwargs):
         plot_df = pd.DataFrame()
@@ -124,7 +124,6 @@ class RMSF(Analysis):
         df[average_by] = self.df[average_by]
         plot_df['mean'] = df.groupby([average_by]).mean().sort_values(by=average_by, ascending=True)['rms'].values
         plot_df['std'] = df.groupby([average_by]).std().sort_values(by=average_by, ascending=True)['rms'].values
-        print(plot_df)
         if 'std' not in kwargs.keys():
             kwargs['std'] = True
         idx = []
