@@ -121,6 +121,7 @@ class RMSF(Analysis):
     def plot_average(self, output, average_by, show, w, h, **kwargs):
         plot_df = pd.DataFrame()
         df = self.df.select_dtypes(exclude=['object'])
+        df[average_by] = self.df[average_by]
         plot_df['mean'] = df.groupby([average_by]).mean().sort_values(by=average_by, ascending=True)['rms'].values
         plot_df['std'] = df.groupby([average_by]).std().sort_values(by=average_by, ascending=True)['rms'].values
         print(plot_df)
