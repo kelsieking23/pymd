@@ -70,22 +70,23 @@ class Analysis:
 
     
     def save(self, **kwargs):
-        params = {}
-        manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']
-        to_dump = {}
-        for key, value in self.__dict__.items():
-            try:
-                json.dumps(value)
-                to_dump[key] = value
-            except:
-                continue
-        for k, v in kwargs.items():
-            to_dump[k] = v
-        filename = os.path.join(self.root, 'job_params.json')
-        with open(filename, 'w') as f:
-            params_dict = json.dumps(to_dump)
-            f.write(params_dict)
-        self.job_params = params_dict
+        if not os.path.isfile(os.path.join(self.root, 'job_params.json')):
+            params = {}
+            manual_keys = ['parent', 'df', 'matrix', 'traj', '_traj', 'top', 'frames']
+            to_dump = {}
+            for key, value in self.__dict__.items():
+                try:
+                    json.dumps(value)
+                    to_dump[key] = value
+                except:
+                    continue
+            for k, v in kwargs.items():
+                to_dump[k] = v
+            filename = os.path.join(self.root, 'job_params.json')
+            with open(filename, 'w') as f:
+                params_dict = json.dumps(to_dump)
+                f.write(params_dict)
+            self.job_params = params_dict
 
     @classmethod
     def from_json(cls, path, inp=None, top=None, parent=None, load_traj=False):

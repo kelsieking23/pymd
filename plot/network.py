@@ -7,22 +7,32 @@ import pandas as pd
 from pymd.utilities.library import code_conversions
 from pymd.utilities.custom_colormaps import create_colormap
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
+from pymd.utilities.library import code_conversions
+import mdtraj 
 
 class Network:
     
-    def __init__(self, nodes=None, edges=None, node_ids=None, labels=None):
+    def __init__(self, nodes=None, edges=None, pdb=None, node_ids=None, labels=None):
         
         self.nodes = [] if nodes is None else nodes
         self.edges = [] if edges is None else edges
-        if nodes is not None:
-            self.labels = [[node.label for node in self.nodes if node.bipartite == 0],
-                           [node.label for node in self.nodes if node.bipartite == 1]]
+        self.pdb = pdb
+        self.labels = labels
+        if self.pdb is not None:
+            self.top = mdtraj.load(self.pdb).topology
+        else:
+            self.top = None
+        if labels is None:
+            if self.nodes == []:
+                self.labels = [[node.label for node in self.nodes if node.bipartite == 0],
+                            [node.label for node in self.nodes if node.bipartite == 1]]
+            else:
+                self.labels = []
 #         self.node_ids = [] if node_ids is None else node_ids
-        self.labels = None
         self.G = nx.Graph()
         self.getNetworkXGraph()
         self.axis = 0
+
     @classmethod
     def fromDataFrame(cls, df, scale=True):
         nodes = []
@@ -85,7 +95,7 @@ class Network:
             'E':'acidic',
             'K':'basic',
             'R':'basic',
-            'H':'basic'
+            'H':'polar'
         }
         colors = {
             'nonpolar':'#c7dd92',
@@ -251,15 +261,7 @@ class Network:
         self.updateEdges()
         return self
 
-        # for bi in bs:
-        #     rev = bi[:]
-        #     rev.reverse()
-        #     for i, node in enumerate(bi):
-        #         node.pos = np.array((rev[i].pos[0], rev[i].pos[1]))
-        #         nodes.append(node)
-        # self.nodes = nodes
-        # self.updateEdges()
-        # return self
+
 
     
     def drawNodes(self, ax=None, size=500, color='tab:blue', alpha=None, edgecolors='black', linewidths=None):
@@ -281,15 +283,7 @@ class Network:
             edgecolors=edgecolors,
             linewidths=linewidths
         )
-        # ax.tick_params(
-        #     axis="both",
-        #     which="both",
-        #     bottom=False,
-        #     left=False,
-        #     labelbottom=False,
-        #     labelleft=False,
-        # )
-        # ax.axis('off')
+
         return ax
     
     def drawNodesByProperty(self, labels, ax=None, size=500, edgecolors='black', linewidths=None):
@@ -322,15 +316,6 @@ class Network:
                 linewidth=linewidths
             )
             node_collection.append(n)
-        # ax.tick_params(
-        #     axis="both",
-        #     which="both",
-        #     bottom=False,
-        #     left=False,
-        #     labelbottom=False,
-        #     labelleft=False,
-        # )
-        # ax.axis('off')
         return ax
 
     def drawEdges(self, ax=None, width=1.0, alpha='weight', color='dimgray', style='solid', 
@@ -368,11 +353,42 @@ class Network:
             ax.text(node.pos[0], node.pos[1], node.label, ha='center', va='center', **kwargs)
         return ax
 
-    def draw(self, labels, ax=None, size=400, edge_color='dimgray', linewidth=1, style='solid', font_dict={}):
+    def setLabels(self, pdb=None, chain_index='all', ignore=[]):
+        if (pdb is None) and (self.top is None):
+            raise ValueError('No .pdb loaded. Pass a .pdb file in this function or when instantiating Network object.')
+        if (self.top is None) and (pdb is not None):
+            self.pdb = pdb
+            self.top = mdtraj.load(self.pdb).topology
+        conversions = code_conversions()
+        labels = []
+        for residue in self.top.residues:
+            if residue.name in ignore:
+                continue
+            if (chain_index != 'all') and (residue.chain.index != chain_index):
+                continue
+            l = conversions[residue.name.lower()].upper() + '$_{' + str(residue.resSeq) + '}$' 
+            labels.append(l)
+        self.labels = labels
+        return labels
+
+    def draw(self, ax=None, size=400, edge_color='dimgray', linewidth=1, style='solid', labels=None, font_dict={}):
+        if labels is None:
+            labels = self.labels
+        self = self.mirror()
         ax = self.drawNodesByProperty(labels, ax=ax, size=size, edgecolors='black')
         ax = self.drawEdges(ax=ax, width=linewidth, style=style, color=edge_color)
         ax = self.drawLabels(labels, ax=ax, **font_dict)
+        ax.tick_params(
+            axis="both",
+            which="both",
+            bottom=False,
+            left=False,
+            labelbottom=False,
+            labelleft=False,
+        )
+        ax.axis('off')
         return ax
+
 
 class Node:
     
