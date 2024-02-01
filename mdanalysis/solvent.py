@@ -464,7 +464,7 @@ class Solvent(Analysis):
                         print('********')
                     ftimes.append(ftime)
                 except:
-                    print('Failure on frame index {}, time {}'format(frame_idx, frame._time[0]))
+                    print('Failure on frame index {}, time {}'.format(frame_idx, frame._time[0]))
             start_str = str(int(first_time))
             end_str = str(int(frame._time[0]))
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
