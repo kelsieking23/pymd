@@ -28,13 +28,35 @@ class Network:
                             [node.label for node in self.nodes if node.bipartite == 1]]
             else:
                 self.labels = []
+        self.properties = {
+            'G':'nonpolar',
+            'A':'nonpolar',
+            'V':'nonpolar',
+            'L':'nonpolar',
+            'I':'nonpolar',
+            'M':'nonpolar',
+            'F':'aromatic',
+            'W':'aromatic',
+            'P':'nonpolar',
+            'Y':'aromatic',
+            'S':'polar',
+            'T':'polar',
+            'C':'polar',
+            'N':'polar',
+            'Q':'polar',
+            'D':'acidic',
+            'E':'acidic',
+            'K':'basic',
+            'R':'basic',
+            'H':'polar'
+        }
 #         self.node_ids = [] if node_ids is None else node_ids
         self.G = nx.Graph()
         self.getNetworkXGraph()
         self.axis = 0
 
     @classmethod
-    def fromDataFrame(cls, df, scale=True):
+    def fromDataFrame(cls, df, pdb=None, scale=True):
         nodes = []
         edges = []
         node_id = 0
@@ -65,7 +87,7 @@ class Network:
                 if (weight !=0 ):
                     edges.append(edge)
                 k += 1
-        return cls(nodes=nodes, edges=edges)
+        return cls(nodes=nodes, edges=edges, pdb=pdb)
 
     @property
     def edgelist(self):
@@ -76,27 +98,27 @@ class Network:
     
     def aaProperties(self, labels):
         properties = {
-            'G':'nonpolar',
-            'A':'nonpolar',
-            'V':'nonpolar',
-            'L':'nonpolar',
-            'I':'nonpolar',
-            'M':'nonpolar',
-            'F':'aromatic',
-            'W':'aromatic',
-            'P':'nonpolar',
-            'S':'polar',
-            'T':'polar',
-            'C':'polar',
-            'Y':'polar',
-            'N':'polar',
-            'Q':'polar',
-            'D':'acidic',
-            'E':'acidic',
-            'K':'basic',
-            'R':'basic',
-            'H':'polar'
-        }
+                    'G':'nonpolar',
+                    'A':'nonpolar',
+                    'V':'nonpolar',
+                    'L':'nonpolar',
+                    'I':'nonpolar',
+                    'M':'nonpolar',
+                    'F':'aromatic',
+                    'W':'aromatic',
+                    'P':'nonpolar',
+                    'Y':'aromatic',
+                    'S':'polar',
+                    'T':'polar',
+                    'C':'polar',
+                    'N':'polar',
+                    'Q':'polar',
+                    'D':'acidic',
+                    'E':'acidic',
+                    'K':'basic',
+                    'R':'basic',
+                    'H':'polar'
+                }
         colors = {
             'nonpolar':'#c7dd92',
             'polar':'#ecc7e0',
@@ -123,6 +145,28 @@ class Network:
         return props
     
     def assignProps(self, labels, props):
+        self.properties = {
+            'G':'nonpolar',
+            'A':'nonpolar',
+            'V':'nonpolar',
+            'L':'nonpolar',
+            'I':'nonpolar',
+            'M':'nonpolar',
+            'F':'aromatic',
+            'W':'aromatic',
+            'P':'nonpolar',
+            'Y':'aromatic',
+            'S':'polar',
+            'T':'polar',
+            'C':'polar',
+            'N':'polar',
+            'Q':'polar',
+            'D':'acidic',
+            'E':'acidic',
+            'K':'basic',
+            'R':'basic',
+            'H':'polar'
+        }
         if (len(labels) == 2) and (isinstance(labels, list)):
             labs = labels[0] + labels[1]
         elif (isinstance(labels, list)):
@@ -139,6 +183,7 @@ class Network:
             node.color = color
             node.code = code
             node.label = l
+            node.prop = self.properties[l[0]]
             nodes.append(node)
         self.nodes = nodes
         self.updateEdges()
@@ -286,7 +331,7 @@ class Network:
 
         return ax
     
-    def drawNodesByProperty(self, labels, ax=None, size=500, edgecolors='black', linewidths=None):
+    def drawNodesByProperty(self, labels, ax=None, size=500, edgecolors='black', linewidths=None, transp=[]):
         if ax is None:
             fig = plt.figure(figsize=(16,12));
             ax = fig.add_subplot(121);
@@ -307,13 +352,21 @@ class Network:
 
         # pos = self.getNodePos()
         for (i, node) in enumerate(self.nodes):
+            if transp == []:
+                alpha = 1
+            else:
+                if node.prop in transp:
+                    alpha = 0.3
+                else:
+                    alpha = 1
             n = ax.scatter(
                 node.pos[0],
                 node.pos[1], 
                 c=node.color,
                 s=size,
                 edgecolor=edgecolors,
-                linewidth=linewidths
+                linewidth=linewidths,
+                alpha=alpha
             )
             node_collection.append(n)
         return ax
@@ -342,7 +395,7 @@ class Network:
             ax.plot(pos[:,0], pos[:,1], color=color, alpha=a, zorder=0, linewidth=width, linestyle=style)
         return ax
     
-    def drawLabels(self, labels, ax=None, **kwargs):
+    def drawLabels(self, labels, ax=None, transp=[], **kwargs):
         if ax is None:
             fig = plt.figure(figsize=(16,12));
             ax = fig.add_subplot(121);
@@ -350,7 +403,14 @@ class Network:
         props = self.aaProperties(labels)
         self.assignProps(labels, props)
         for node in self.nodes:
-            ax.text(node.pos[0], node.pos[1], node.label, ha='center', va='center', **kwargs)
+            if transp == []:
+                alpha = 1
+            else:
+                if node.prop in transp:
+                    alpha = 0.3
+                else:
+                    alpha = 1
+            ax.text(node.pos[0], node.pos[1], node.label, ha='center', va='center', alpha=alpha, **kwargs)
         return ax
 
     def setLabels(self, pdb=None, chain_index='all', ignore=[]):
@@ -366,18 +426,21 @@ class Network:
                 continue
             if (chain_index != 'all') and (residue.chain.index != chain_index):
                 continue
-            l = conversions[residue.name.lower()].upper() + '$_{' + str(residue.resSeq) + '}$' 
+            l = conversions[residue.name.lower()].upper() + '$_{' + str(residue.resSeq) + '}$'
             labels.append(l)
         self.labels = labels
         return labels
 
-    def draw(self, ax=None, size=400, edge_color='dimgray', linewidth=1, style='solid', labels=None, font_dict={}):
+    def draw(self, ax=None, size=400, edge_color='dimgray', linewidth=1, style='solid', transp=[], labels=None, font_dict={}):
         if labels is None:
-            labels = self.labels
+            if self.labels is not None:
+                labels = self.labels
+            if self.pdb is not None:
+                labels = self.setLabels(self.pdb)
         self = self.mirror()
-        ax = self.drawNodesByProperty(labels, ax=ax, size=size, edgecolors='black')
+        ax = self.drawNodesByProperty(labels, ax=ax, size=size, edgecolors='black', transp=transp)
         ax = self.drawEdges(ax=ax, width=linewidth, style=style, color=edge_color)
-        ax = self.drawLabels(labels, ax=ax, **font_dict)
+        ax = self.drawLabels(labels, ax=ax, transp=transp, **font_dict)
         ax.tick_params(
             axis="both",
             which="both",
@@ -386,6 +449,7 @@ class Network:
             labelbottom=False,
             labelleft=False,
         )
+        ax.set_clip_on(False)
         ax.axis('off')
         return ax
 
@@ -401,6 +465,8 @@ class Node:
         self.code = 'X'
         self.color = 'tab:blue'    
         self.label = 'X'
+        self.alpha = 1
+        self.prop = None
     @classmethod
     def fromData(cls, label, bipartite, id_):
         data = {

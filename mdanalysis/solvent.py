@@ -447,21 +447,24 @@ class Solvent(Analysis):
                 if self.verbose:
                     print('>> Made {} periodic images'.format(len(images)))
                 # images = np.array([])
-                shell = self.get_solvent_shell(frame, radius, periodic=images)
-                pdb_indeces = np.array(list(self.protein_indeces) + list(shell))
-                self._topdb(frame, pdb_indeces, os.path.join(output_path, f'test_shell_{frame_idx}.pdb'))
+                try:
+                    shell = self.get_solvent_shell(frame, radius, periodic=images)
+                    pdb_indeces = np.array(list(self.protein_indeces) + list(shell))
+                # self._topdb(frame, pdb_indeces, os.path.join(output_path, f'test_shell_{frame_idx}.pdb'))
 
-                solvent_ndx[str(int(frame._time[0]))] = shell
-                solvent_data.append([frame_idx, frame._time[0], len(shell)])
-                frame_idx += 1
-                if first_time is None:
-                    first_time = frame._time[0]
-                fend = time.time()
-                ftime = fend - fstart
-                if self.verbose:
-                    print('>> Frame runtime: {} s'.format(ftime))
-                    print('********')
-                ftimes.append(ftime)
+                    solvent_ndx[str(int(frame._time[0]))] = shell
+                    solvent_data.append([frame_idx, frame._time[0], len(shell)])
+                    frame_idx += 1
+                    if first_time is None:
+                        first_time = frame._time[0]
+                    fend = time.time()
+                    ftime = fend - fstart
+                    if self.verbose:
+                        print('>> Frame runtime: {} s'.format(ftime))
+                        print('********')
+                    ftimes.append(ftime)
+                except:
+                    print('Failure on frame index {}, time {}'format(frame_idx, frame._time[0]))
             start_str = str(int(first_time))
             end_str = str(int(frame._time[0]))
             out = os.path.join(output_path, f'solventidx.{start_str}.{end_str}.npz')
