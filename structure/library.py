@@ -1,14 +1,14 @@
 def charged():
-    return ['ARG', 'HIS', 'LYS', 'ASP', 'GLU']
+    return ['ARG', 'LYS', 'ASP', 'GLU']
 
 def pos_charged():
-    return ['ARG', 'HIS', 'LYS']
+    return ['ARG', 'LYS']
 
 def neg_charged():
     return ['ASP', 'GLU']
 
 def polar():
-    return ['SER', 'THR', 'ASN', 'GLN', 'CYS']
+    return ['SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS']
 
 def hydrophobic():
     return ['ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP', 'GLY', 'PRO']

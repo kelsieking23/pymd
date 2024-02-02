@@ -96,7 +96,7 @@ class Network:
             edgelist.append((edge.nodes[0], edge.nodes[1]))
         return edgelist
     
-    def aaProperties(self, labels):
+    def aaProperties(self, labels, colors={}):
         properties = {
                     'G':'nonpolar',
                     'A':'nonpolar',
@@ -119,13 +119,18 @@ class Network:
                     'R':'basic',
                     'H':'polar'
                 }
-        colors = {
-            'nonpolar':'#c7dd92',
-            'polar':'#ecc7e0',
-            'acidic':'#dc967d',
-            'basic':'#afd5f8',
-            'aromatic':'#f2edb4'
-        }
+        # d8d8d8
+        # green #c7dd92
+        # yellow #f2edb4
+        if colors == {}:
+            colors = {
+                'nonpolar':'#d8d8d8',
+                'polar':'#8db7d3',
+                'acidic':'#cc441f',
+                'basic':'#0072bf',
+                'aromatic':'#d8d8d8',
+                'special':'#d87939'
+            }
         props = {}
         for grp in labels:
             for label in grp:
