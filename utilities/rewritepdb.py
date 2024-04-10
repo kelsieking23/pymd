@@ -1,6 +1,7 @@
 import os 
 import sys
 from pymd.structure.structure_file import StructureFile
+from pymd.utilities.library import residues as _residues
 
 def addChainID(filename, newfilename, nterm, cterm):
     
@@ -233,7 +234,6 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
         
         # get res id
         res_id = ld.residue_name + str(ld.residue_number)
-
         #check for residue change
         if last_res_id is not None:
             if last_res_id != res_id:
@@ -248,6 +248,15 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
                         res_counter = start
                 else:
                     _real_chain_id = chr(ord(_real_chain_id) + 1)
+            elif (ld.residue_id != last_res_id) and (ld.residue_name not in _residues()):
+                if chain_id != '':
+                    chain_id = chr(ord(chain_id) + 1)
+                    _real_chain_id = chr(ord(_real_chain_id) + 1)
+                    if renumber_chain:
+                        res_counter = start
+                else:
+                    _real_chain_id = chr(ord(_real_chain_id) + 1)
+
         # check if residue counter > 9999
         if res_counter > 9999:
             res_counter = 0
@@ -265,10 +274,17 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
         # format and save line for writing
         line_parts = ['ATOM', str(atom_counter), ld.atom_name, ld.residue_name, chain_id, str(res_counter), 
               ld.x, ld.y, ld.z, ld.occ, ld.temp, ld.segid, ld.elem, ld.charge]
-        if len(ld.atom_name) > 3:
-            line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+        if len(ld.residue_name) <= 3:
+            if len(ld.atom_name) > 3:
+                line = '{:<4s}{:>7s} {:<4s} {:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+            else:
+                line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
         else:
-            line = '{:<4s}{:>7s}  {:<4s}{:>3s} {:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+            if len(ld.atom_name) > 3:
+                line = '{:<4s}{:>7s} {:<4s} {:>3s}{:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+            else:
+                line = '{:<4s}{:>7s}  {:<4s}{:>3s}{:1s}{:>4s}    {:>8.3f}{:>8.3f}{:>8.3f}  {:>1.2f}  {:>1.2f}{:>10s} {}{}\n'.format(*line_parts)
+
         new_contents.append(line)
 
         # update last data

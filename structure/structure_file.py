@@ -122,7 +122,41 @@ class StructureFile:
         return atoms
 
     def gro(self):
-        return []
+        atoms = []
+        atom_index = 0
+        residue_index = 0
+        i = 0
+        for line in self.structureReader():
+            if i < 2:
+                i += 1
+                continue
+                # yield line
+            try:
+                residue_number = int(line[0:5].strip())
+                residue_name = line[5:10].strip()
+                atom_name = line[10:15].strip()
+                atom_number = int(line[15:20].strip())
+                residue_id = '{}{}'.format(residue_name, residue_number)
+                x = float(line[20:29].strip())
+                y = float(line[29:37].strip())
+                z = float(line[37:46].strip())
+                if (len(line) > 45):
+                    vx = float(line[46:55].strip())
+                    vy = float(line[55:64].strip())
+                    vz = float(line[64:73].strip())
+                else:
+                    vx = 0.0
+                    vy = 0.0
+                    vz = 0.0
+                atom = GroAtomData(atom_number, atom_index, atom_name, residue_name, residue_id,
+                                   residue_number, residue_index, x, y, z, vx, vy, vz)
+                atom_index += 1
+                residue_index += 1
+                yield atom
+            except:
+                pass
+            i += 1
+        return atoms
 
     def sdf(self):
         return []
@@ -131,6 +165,22 @@ class StructureFile:
         return []
 
                 
+@dataclass
+class GroAtomData:
+    atom_number: int
+    atom_index: int
+    atom_name: str
+    residue_name: str
+    residue_id: str
+    residue_number: int
+    residue_index: int
+    x: float
+    y: float
+    z: float
+    vx: float
+    vy: float
+    vz: float
+
 
 @dataclass
 class AtomData:
@@ -154,4 +204,3 @@ class AtomData:
     charge:str
     model: float
     box: tuple
-
