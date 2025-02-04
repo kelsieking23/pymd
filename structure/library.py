@@ -1,3 +1,10 @@
+import os
+import warnings
+warnings.filterwarnings('ignore')
+import pandas as pd
+from pymd import dir_path
+
+
 def charged():
     return ['ARG', 'LYS', 'ASP', 'GLU']
 
@@ -8,10 +15,18 @@ def neg_charged():
     return ['ASP', 'GLU']
 
 def polar():
-    return ['SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS']
+    return ['SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS', 'HSD']
 
 def hydrophobic():
     return ['ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP', 'GLY', 'PRO']
+
+def _canonical():
+    canon = charged() + polar() + hydrophobic()
+    unique = []
+    for item in canon:
+        if item not in unique:
+            unique.append(item)
+    return unique
 
 def propdict():
     return {
@@ -122,3 +137,21 @@ def mjhw_zscores():
     for k, v in oneletters.items():
         dic[oneletter_to_threeletter()[k]] = v
     return dic
+
+cannonical = _canonical()
+
+
+def get_scale(scale, get_as='dict'):
+    scale_csv = os.path.join(dir_path, 'structure', 'hydrophobicity_scores.csv')
+    df = pd.read_csv(scale_csv)
+    df.columns = [col.lower().strip() for col in df.columns]
+    if get_as == 'dict':
+        _scale = {}
+        for code, value in zip(df['3letter'], df[scale]):
+            _scale[code] = float(value)
+        return _scale
+    if get_as == 'list':
+        _scale = []
+        for code, value in zip(df['3letter'], df[scale]):
+            _scale.append([code, float(value)])
+        return _scale

@@ -168,7 +168,11 @@ class System:
             num_interactions = 0
             for res_id in self.protein.ids:
                 res_com = self.protein.coms[res_id]
-                for coord in ligand.coordinates:
+                if isinstance(ligand.coordinates, dict):
+                    coords = [value for value in ligand.coordinates.values()]
+                else:
+                    coords = ligand.coordinates
+                for coord in coords:
                     d = np.sqrt((coord[0] - res_com[0])**2 + (coord[1] - res_com[1])**2 + (coord[2] - res_com[2])**2)
                     if d <= distance:
                         num_interactions += 1
@@ -213,30 +217,32 @@ class System:
         '''
         Gets minimum distance by atom. Creates an attribute of ligand containing minimum distance matrix. 
         '''
+        _ligands = []
         for ligand in self.ligands:
             mindist = {}
             for residue in self.protein.residues:
                 mindist[residue.id] = {}
-                d = None
+                min_d = None
                 protein_atom_name = None
                 ligand_atom_name = None
                 for protein_atom in residue.atoms:
                     for ligand_atom in ligand.atoms:
                         _d = self.euclideanDistance(protein_atom.coordinates, ligand_atom.coordinates)
-                        if d is None:
-                            d = _d
+                        if min_d is None:
+                            min_d = _d
                             protein_atom_name = protein_atom.name
                             ligand_atom_name = ligand_atom.name
-                        if (d > _d):
-                            d = _d
+                        if (min_d > _d):
+                            min_d = _d
                             protein_atom_name = protein_atom.name
                             ligand_atom_name = ligand_atom.name
-                mindist[residue.id]['distance'] = d 
+                mindist[residue.id]['distance'] = min_d 
                 mindist[residue.id]['protein_atom'] = protein_atom_name
                 mindist[residue.id]['ligand_atom'] = ligand_atom_name
             df = pd.DataFrame(mindist).T
             ligand.minimum_distance = df
-            yield df
+            _ligands.append(ligand)
+        self.ligands = _ligands
 
 
     def averageDistance(self, to_csv=None):

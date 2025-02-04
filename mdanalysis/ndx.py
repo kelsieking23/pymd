@@ -34,7 +34,7 @@ class Ndx:
     
     @property
     def residues(self):
-        residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
+        residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD', 'HSE']
         residues = [item.lower() for item in residues]
         return residues
     
@@ -351,8 +351,8 @@ class Ndx:
         residues = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
         residues = [item.lower() for item in residues]
         caps = ['ace', 'nh2']
-        lipids = ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC', 'DOPC']
-        gangliosides = ['cer', 'bglc', 'bgal', 'ane5', 'cer1']
+        lipids = ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DPPC', 'DDPC', 'DOPC', 'POPI']
+        gangliosides = ['cer', 'bglc', 'bgal', 'ane5', 'cer1', 'cer16', 'bgaln', 'ane5a']
         lipids = [item.lower() for item in lipids]
         backbone = ['ca', 'c', 'n']
         mainchain = ['ca', 'c', 'o', 'n', 'hn', 'h', 'ha', 'h1', 'h2', 'h3', 'o1', 'o2']

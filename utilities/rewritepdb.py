@@ -216,11 +216,11 @@ def renumberByChain(filename, newfilename, start=1):
         f.write(line)
     f.close()
 
-def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
+def editchainID_v2(filename, output=None, start=1, atom_start=1,renumber_chain=True):
     struct = StructureFile(filename)
     new_contents = ['REMARK    CHAIN ID EDITED BY BY pymd.utilities.rewritepdb.editchainID_v2\n']
     res_counter = start
-    atom_counter = 1
+    atom_counter = atom_start
     last_chain_index = None
     last_res_id = None
     last_res_num = None
@@ -234,6 +234,10 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
         
         # get res id
         res_id = ld.residue_name + str(ld.residue_number)
+        if ld.residue_name not in _residues():
+            new_contents.append(ld.line)
+            continue
+
         #check for residue change
         if last_res_id is not None:
             if last_res_id != res_id:
@@ -269,7 +273,7 @@ def editchainID_v2(filename, output=None, start=1, renumber_chain=True):
         if ld.chain_index != last_chain_index:
             res_counter = start
 
-        if ld.residue_name in ['SOL', 'NA', 'CL', 'TIP3', 'CLA', 'SOD', 'POT']:
+        if ld.residue_name not in _residues():
             chain_id = ''
         # format and save line for writing
         line_parts = ['ATOM', str(atom_counter), ld.atom_name, ld.residue_name, chain_id, str(res_counter), 

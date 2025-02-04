@@ -58,7 +58,7 @@ class RMSD(Analysis):
     def rmsd(frames, ref):
         rms = []
         for frame in frames:
-            rms.append(np.sqrt((np.linalg.norm(frame-ref) / frame.shape[0])))
+            rms.append(np.sqrt((np.linalg.norm(frame-ref) / frame.shape[0])**2))
         return np.array(rms)
 
     

@@ -11,6 +11,7 @@ import sys
 # imports from pymd
 sys.path.append(os.getcwd())
 from pymd.structure.ligand import Ligand
+from pymd.structure.structure_file import StructureFile, AtomData
 from pymd.utilities.rewritepdb import addChainID
 from pymd.utilities.rewritepdb import writePDB
 from pymd.utilities.rewritepdb import editChainIDResidue
@@ -79,15 +80,19 @@ class Protein:
         extension = self.structure[-3:]
         if extension.lower() == 'gro':
             self.structure = self.groHandler()
+        self.residues = self.getResidues()
+        self.ids = [residue.id for residue in self.residues]
         # self.structure = self.checkChainID()
         # get residue data
+        '''
         if residues is None:
             self.ids, ligand_structure = self.getResidueIds(ignore)
         else:
             self.ids = residues
         self.coordinates = self.getResidueCoordinates()
         self.atom_coordinates = self.getAtomCoordinates()
-        self.residues = self.getResidues()
+        '''
+        '''
         self.atoms = self.getAtoms()
         self.chains = self.getChains()
         self.peptides = len(self.chains.keys())
@@ -109,6 +114,7 @@ class Protein:
                 self.ligands.append(Ligand(structure=self.structure, covalent_id=covalent_ids, name=covalent_ids))
 
         self.id = id
+        '''
     @property
     def molecularWeight(self):
         mw = 0
@@ -159,11 +165,11 @@ class Protein:
         return ca
 
     def structureReader(self):
-        f = open(self.structure, 'r')
-        contents = f.readlines()
-        f.close()
-        for line in contents:
-            yield line
+        structure_file = StructureFile(self.structure)
+        _, ext = os.path.splitext(self.structure)
+        if ext == '.pdb':
+            for line in structure_file.pdb():
+                yield line
 
     def groHandler(self):
         f = open(self.structure, 'r')
@@ -628,34 +634,26 @@ class Protein:
 
     def getResidues(self):
         residues = []
-        residue_index = 0
         last_residue_id_chain = None
         data = []
         i = 0
         for line in self.structureReader():
-            line_parts = line.split()
-            if not line.startswith('ATOM'):
+            if isinstance(line, str):
                 continue
-            if ('SOL' in line) or ('SWM4' in line):
-                break
-            residue_name = line_parts[3]
-            if residue_name not in self.ignore:
-                residue_number = line_parts[5]
-                chain = line_parts[4]
-                residue_id = residue_name + residue_number
-                residue_id_chain = residue_id + chain
-                if (residue_id_chain == last_residue_id_chain) or (last_residue_id_chain is None):
-                    data.append(line_parts)
-                else:
-                    residue = Residue(data=data, index=i)
-                    residues.append(residue)
-                    i += 1
-                    data = []
-                    data.append(line_parts)
-                last_residue_id_chain = residue_id_chain
+            residue_id_chain = line.residue_id + line.chain 
+            if (residue_id_chain == last_residue_id_chain) or (last_residue_id_chain is None):
+                data.append(line)
+            else:
+                residue = Residue(data=data, index=i)
+                residues.append(residue)
+                i += 1
+                data = []
+                data.append(line)
+            last_residue_id_chain = residue_id_chain
         residue = Residue(data=data, index=i)
         residues.append(residue)
         return residues
+
 
     def getAtoms(self):
         atoms = []
@@ -663,8 +661,10 @@ class Protein:
             for atom in residue.atoms:
                 atoms.append(atom)
         return atoms
+    
     def ligandInteraction(self):
         coms = self.getResidueCOM()
+
     
     @staticmethod
     def mindistAtoms(x, y):
@@ -680,6 +680,8 @@ class Protein:
     def distance(x,y):
         return np.sqrt((x[0]-y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
 
+    def residue(self, index):
+        return self.residues[index]
 
 class Residue:
 
@@ -705,22 +707,23 @@ class Residue:
         else:
             # print('idk what this residue is :(')
             self.getResidueData(data)
+
     def isResidue(self, data):
-        residue_name = data[0][3]
+        residue_name = data[0].residue_name
         if residue_name not in library.residues():
             return False
         self.restype = 'residue'
         return True
         
     def isNucleic(self, data):
-        residue_name = data[0][3]
+        residue_name = data[0].residue_name
         if residue_name not in library.dna():
             return False
         self.restype = 'nucleic'
         return True
 
     def isLipid(self, data):
-        residue_name = data[0][3]
+        residue_name = data[0].residue_name
         if residue_name.startswith(tuple(library.lipid())):
             return False
         self.restype = 'lipid'
@@ -745,23 +748,20 @@ class Residue:
 
     def getResidueData(self, data):
         first_line = data[0]
-        first_line_clean = self.linecheck(first_line)
-        self.name = first_line_clean[3]
-        try:
-            self.number = int(first_line_clean[5])
-        except:
-            self.number = int(first_line_clean[4])
+        # first_line_clean = self.linecheck(first_line)
+        self.name = first_line.residue_name
+        self.number = int(first_line.residue_number)
         self.num = self.number
-        self.id = self.name + str(self.number)
-        self.chain = first_line_clean[4]
+        self.id = first_line.residue_id
+        self.chain = first_line.chain
         self.atoms = []
         self.hydrogens = []
-        for line_parts in data:
-            atom = Atom(data=self.linecheck(line_parts), residue=self)
+        for line in data:
+            atom = Atom(line, residue=self)
             self.atoms.append(atom)
             if 'H' in atom.name:
                 self.hydrogens.append(atom)
-        self.getHydrogenConnections()
+        # self.getHydrogenConnections()
 
     def getHydrogenConnections(self):
         for hydrogen in self.hydrogens:
@@ -809,22 +809,13 @@ class Residue:
 class Atom:
     def __init__(self, data, residue):
         self.residue = residue
-        self.name = data[2]
-        self.number = int(data[1])
-        self.index = self.number-1
-        if not data[4].isnumeric():
-            try:
-                self.coordinates = list(map(float, data[6:9]))
-            except:
-                self.coordinates = fixBadCoordinates(data[6:9])
-        else:
-            try:
-                self.coordinates = list(map(float, data[5:8]))
-            except:
-                self.coordinates = fixBadCoordinates(data[5:8])
+        self.name = data.atom_name
+        self.number = data.atom_number
+        self.index = data.atom_index
+        self.coordinates = (data.x, data.y, data.z)
 
         self.electronegative = None
-        self.type = data[-1][0]
+        self.type = data.elem
 
         if self.name == 'H':
             self.hbond = True

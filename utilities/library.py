@@ -1,10 +1,10 @@
 
 def residues():
-    return ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD']
+    return ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLU', 'GLN', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL', 'HSD', 'HSE']
 
 def lipids():
-    return ['POPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC', 'POPI', 'POPG',
-            'CER1']
+    return ['POPC', 'DPPC', 'DOPC', 'CHL1', 'SDPE', 'POPE', 'PSM', 'SOPS', 'POPE', 'POPS', 'SM', 'CHOL', 'DLPG', 'DDPC', 'POPI', 'POPG',
+            'CER1', 'CER16', 'CER160']
 
 def ions():
     return ['k'.upper(), 'cl'.upper(), 'na'.upper(), 'sod'.upper(), 'cla'.upper(), 'pot'.upper()]

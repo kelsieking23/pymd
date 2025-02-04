@@ -1,21 +1,37 @@
 import os
 from dataclasses import dataclass
+from typing import Union
 
 class StructureFile:
 
-    def __init__(self, inp):
+    def __init__(self, inp, atom_data=[]):
         self.inp = inp
+        self.atoms = atom_data
+        if self.inp is not None:
+            _, ext = os.path.splitext(self.inp)
+            self.ext = ext[1:]
+            if self.ext != 'gro':
+                self.atoms = [atom for atom in self.read()]
+        else:
+            self.ext = None
+        # self.atoms = [atom for atom in self.read()]
 
-    def structureReader(self):
+    def _structureReader(self):
+        with open(self.inp, 'r') as f:
+            for line in f:
+                yield line
+
+    def read(self):
         '''
         Iterates through structure file and yeilds lines.
         '''
-        f = open(self.inp, 'r')
-        contents = f.readlines()
-        f.close()
-        for line in contents:
-            yield line
+        if self.ext == 'pdb':
+            return self.pdb()
 
+
+    def write(self, out):
+        if self.ext == 'pdb':
+            self.write_pdb(self.atoms, out)
     def get_atom_data_pdb(self, line):
         pass
     
@@ -29,7 +45,7 @@ class StructureFile:
         charge = ''
         box = (0,0,0)
         model = 1
-        for line in self.structureReader():
+        for line in self._structureReader():
             if (line.startswith('*')) or ('EXT' in line) or (line.strip() == ''):
                 continue
             else:
@@ -54,7 +70,9 @@ class StructureFile:
                 temp = 0.00
                 occ = 0.00
                 if not writer:
-                    atom = AtomData(atom_number, atom_index, atom_name, residue_name, residue_id, chain, chain_index, residue_number, residue_index, x, y, z, occ, temp, segid, elem, charge, model, box)
+                    atom = AtomData(atom_number, atom_index, atom_name, residue_name, residue_id, chain, chain_index, 
+                                    residue_number, residue_index, x, y, z, occ, temp, segid, elem, charge, model, box, 
+                                    line, False, '', 'crd')
                     yield atom
                 else:
                     atom = ['ATOM', str(atom_number), atom_name, residue_name, chain, str(residue_number), x, y, z, '1.00', '0.00', segid, elem]
@@ -69,7 +87,7 @@ class StructureFile:
         chain_index = -1
         residue_index = -1
         box = (0,0,0)
-        for line in self.structureReader():
+        for line in self._structureReader():
             line_parts = line.split()
             if len(line_parts) == 0:
                 continue
@@ -80,7 +98,7 @@ class StructureFile:
                 residue_index = 0
                 last_chain = None
                 last_residue = None
-            elif line.startswith('ATOM'):
+            elif (line.startswith('ATOM')) or (line.startswith('HETATM')):
                 atom_number = int(line[6:11].strip())
                 atom_name = line[12:16].strip()
                 residue_name = line[17:21].strip()
@@ -109,16 +127,13 @@ class StructureFile:
                     charge = ''
                 atom = AtomData(atom_number, atom_index, atom_name, residue_name, residue_id, 
                                 chain, _chain_index, residue_number, residue_index,
-                                x, y, z, occ, temp, segid, elem, charge, model, box)
+                                x, y, z, occ, temp, segid, elem, charge, model, box, line, True, line[0:6].strip(), 'pdb', self)
                 atom_index += 1
                 last_chain = chain
                 last_residue = residue_name + str(residue_number)
                 yield atom
-            elif line.startswith('HETATM'):
-                #TODO: add hetatm
-                pass
             else:
-                yield line
+                continue
         return atoms
 
     def gro(self):
@@ -126,11 +141,10 @@ class StructureFile:
         atom_index = 0
         residue_index = 0
         i = 0
-        for line in self.structureReader():
+        for line in self._structureReader():
             if i < 2:
                 i += 1
                 continue
-                # yield line
             try:
                 residue_number = int(line[0:5].strip())
                 residue_name = line[5:10].strip()
@@ -141,15 +155,15 @@ class StructureFile:
                 y = float(line[29:37].strip())
                 z = float(line[37:46].strip())
                 if (len(line) > 45):
-                    vx = float(line[46:55].strip())
-                    vy = float(line[55:64].strip())
-                    vz = float(line[64:73].strip())
+                    vx = float(line[46:53].strip())
+                    vy = float(line[53:61].strip())
+                    vz = float(line[61:].strip())
                 else:
                     vx = 0.0
                     vy = 0.0
                     vz = 0.0
                 atom = GroAtomData(atom_number, atom_index, atom_name, residue_name, residue_id,
-                                   residue_number, residue_index, x, y, z, vx, vy, vz)
+                                   residue_number, residue_index, x, y, z, vx, vy, vz, line)
                 atom_index += 1
                 residue_index += 1
                 yield atom
@@ -164,7 +178,26 @@ class StructureFile:
     def mol(self):
         return []
 
-                
+    @staticmethod
+    def write_gro(atom_data, out, title='Title', box=[0.0, 0.0, 0.0]):
+        with open(out, 'w') as f:
+            f.write(f'{title}\n')
+            f.write(f' {len(atom_data)}\n')
+            for atom in atom_data:
+                ld = [atom.residue_number, atom.residue_name, atom.atom_name, atom.atom_number, atom.x, atom.y, atom.z,
+                    atom.vx, atom.vy, atom.vz]
+                line = '{:>5d}{:<5s}{:>5s}{:>5d}{:>8.3f}{:>8.3f}{:>8.3f}{:>8.4f}{:>8.4f}{:>8.4f}\n'.format(*ld)
+                f.write(line)
+            f.write('   {:.7f}   {:.7f}   {:.7f}\n'.format(*box))
+    
+    @staticmethod
+    def write_pdb(atom_data, out):
+        with open(out, 'w') as f:
+            for atom in atom_data:
+                f.write(atom.line)
+            
+
+    
 @dataclass
 class GroAtomData:
     atom_number: int
@@ -180,27 +213,94 @@ class GroAtomData:
     vx: float
     vy: float
     vz: float
+    line: str
+
+    def update_line(self):
+        ld = [self.residue_number, self.residue_name, self.atom_name, self.atom_number, self.x, self.y, self.z,
+              self.vx, self.vy, self.vz]
+        line = '{:>5d}{:<5s}{:>5s}{:>5d}{:>8.3f}{:>8.3f}{:>8.3f}{:>8.4f}{:>8.4f}{:>8.4f}\n'.format(*ld)
+        self.line = line
+        return self
 
 
-@dataclass
 class AtomData:
 
-    atom_number: int
-    atom_index: int
-    atom_name: str
-    residue_name: str
-    residue_id: str
-    chain: str
-    chain_index: int
-    residue_number: int
-    residue_index: int
-    x: float
-    y: float
-    z: float
-    occ:float
-    temp:float
-    segid: str
-    elem: str
-    charge:str
-    model: float
-    box: tuple
+    def __init__(self, atom_number: int, atom_index: int, atom_name: str, residue_name: str, residue_id: str,
+                 chain: str, chain_index: int, residue_number: int, residue_index: int, x: float, y: float, z: float,
+                 occ:float, temp: float, segid: str, elem: str, charge: str, model: float, box: tuple, line: str, 
+                 is_pdb: bool, pdb_label: str, ext: str, parent: Union[StructureFile, None]):
+        self._atom_number = atom_number
+        self.atom_index = atom_index
+        self.atom_name = atom_name
+        self.residue_name = residue_name
+        self.residue_id = residue_id
+        self.chain = chain
+        self.chain_index = chain_index
+        self._residue_number = residue_number
+        self.residue_index = residue_index
+        self.x = x
+        self.y = y
+        self.z = z
+        self.occ = occ
+        self.temp = temp
+        self.segid = segid
+        self.elem = elem
+        self.charge = charge
+        self.model = model
+        self.box = box
+        self._line = line
+        self.is_pdb = is_pdb
+        self.pdb_label = pdb_label
+        self.ext = ext
+        self.parent = parent
+        self.update_dict: dict={
+                'pdb':self._update_pdb,
+                'crd':self._update_crd}
+        
+    def __str__(self):
+        return f'<pymd.structure.structure_file.AtomData Object>: {self.atom_number} {self.atom_name} {self.residue_number} {self.residue_name} {self.chain}'
+
+    def _update_parent(self):
+        self._line = self.update_dict[self.ext]
+        self.parent.atoms[self.atom_index] = self
+
+    @property
+    def atom_number(self):
+        return self._atom_number
+    
+    @atom_number.setter
+    def atom_number(self, number):
+        try:
+            self._atom_number = int(number)
+        except Exception:
+            raise ValueError(f'Error setting attribute "atom_number"')
+        self._update_parent()
+    
+    @property
+    def residue_number(self):
+        return self._residue_number
+    
+    @residue_number.setter
+    def residue_number(self, number):
+        try:
+            self._residue_number = int(number)
+        except Exception:
+            raise ValueError(f'Error setting attribute "residue_number"')
+        self._update_parent()
+
+    @property
+    def line(self):
+        if self.ext == 'pdb':
+            self._line = self._update_pdb()
+            if isinstance(self.parent, StructureFile):
+                self.parent.atoms[self.atom_index] = self
+        return self._line
+    
+    def _update_pdb(self):
+        line = [self.pdb_label, self.atom_number, self.atom_name, self.residue_name, self.chain, self.residue_number, self.x, self.y, self.z,
+                self.occ, self.temp, self.segid, self.elem]
+        string = "{:6s}{:5d} {:^4s} {:^4s}{:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}{:>9s}  {:<3s}\n".format(*line)
+        return string
+
+    def _update_crd(self):
+        return ''
