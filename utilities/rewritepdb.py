@@ -1069,3 +1069,5 @@ def addChainIDLipid(filename, protein_chains=((1, -1),), lipids=['POPC', 'CHL1',
     f.close()
         
 
+if __name__ == '__main__':
+    editchainID_v2('top.nowat.pdb', 'top.nowat.chain.pdb', renumber_chain=False)
