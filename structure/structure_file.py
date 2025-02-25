@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Union
+# from pymd.structure.library import _canonical
 
 class StructureFile:
 
@@ -21,10 +22,17 @@ class StructureFile:
             for line in f:
                 yield line
 
+    def _atomDataIterator(self):
+        for atom in self.atoms:
+            yield atom
+        return self.atoms
+
     def read(self):
         '''
         Iterates through structure file and yeilds lines.
         '''
+        if self.ext is None:
+            return self._atomDataIterator()
         if self.ext == 'pdb':
             return self.pdb()
 
@@ -196,7 +204,9 @@ class StructureFile:
             for atom in atom_data:
                 f.write(atom.line)
             
-
+    @classmethod
+    def fromAtomData(cls, atom_data):
+        return cls(inp=None, atom_data=atom_data)
     
 @dataclass
 class GroAtomData:
@@ -256,6 +266,8 @@ class AtomData:
         self.update_dict: dict={
                 'pdb':self._update_pdb,
                 'crd':self._update_crd}
+        self._cannonical = ['ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP', 'GLY', 'PRO', 
+                            'SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS', 'HSD', 'ASP', 'GLU', 'ARG', 'LYS']
         
     def __str__(self):
         return f'<pymd.structure.structure_file.AtomData Object>: {self.atom_number} {self.atom_name} {self.residue_number} {self.residue_name} {self.chain}'
@@ -299,8 +311,38 @@ class AtomData:
     def _update_pdb(self):
         line = [self.pdb_label, self.atom_number, self.atom_name, self.residue_name, self.chain, self.residue_number, self.x, self.y, self.z,
                 self.occ, self.temp, self.segid, self.elem]
-        string = "{:6s}{:5d} {:^4s} {:^4s}{:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}{:>9s}  {:<3s}\n".format(*line)
+        string = "{:6s}{:5d} {:^4s} {:^4s}{:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}{:>10s}  {:<3s}\n".format(*line)
         return string
 
     def _update_crd(self):
         return ''
+    
+    def _in_rtp(self, rtp):
+        with open(rtp, 'r') as f:
+            for line in f:
+                if line.startswith('[ '):
+                    entry = line.strip()[2:-2]
+                    if entry.upper() == self.residue_name.upper():
+                        return True
+        return False
+    
+    def mol_type(self, ff='guess'):
+        '''
+        at this moment super rudimentary, but just want to be able to ID if it is protein or not protein. 
+        ff (str) : can be 'guess', which means just go off of _cannonical() which is hard coded
+                   ff can also be a path to a force field folder that contains an aminoacids.rtp file
+        '''
+        if ff == 'guess':
+            if self.residue_name in self._cannonical:
+                return 'protein'
+            else:
+                return 'other'
+        else:
+            if self._in_rtp(os.path.join(ff, 'aminoacids.rtp')):
+                return 'protein'
+            else:
+                for file in os.listdir(ff):
+                    if file.endswith('rtp'):
+                        if self._in_rtp(os.path.join(ff, file)):
+                            return os.path.splitext(file)[0]
+                return 'other'
