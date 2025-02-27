@@ -6,14 +6,17 @@ from argparse import RawTextHelpFormatter
 
 class Ndx:
 
-    def __init__(self, gro, peptides=1, ndxt=None, ligands=None):
+    def __init__(self, gro=None, peptides=1, ndxt=None, ligands=None):
         self.gro = gro
         self.ext = os.path.splitext(self.gro)[1][1:]
         # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
-        self.types = self.getTypes(self.ndxt_groups, ligands)
+        if self.gro is not None:
+            self.types = self.getTypes(self.ndxt_groups, ligands)
+        else:
+            self.types = {}
         # self.topology = Topology(gro)
         # self.types = {}
         # for key in types.keys():

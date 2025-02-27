@@ -38,7 +38,11 @@ class StructureFile:
 
 
     def write(self, out):
-        if self.ext == 'pdb':
+        if self.ext == None:
+            ext = os.path.splitext(out)[1][1:]
+        else:
+            ext = self.ext 
+        if ext == 'pdb':
             self.write_pdb(self.atoms, out)
     def get_atom_data_pdb(self, line):
         pass
@@ -312,6 +316,7 @@ class AtomData:
         line = [self.pdb_label, self.atom_number, self.atom_name, self.residue_name, self.chain, self.residue_number, self.x, self.y, self.z,
                 self.occ, self.temp, self.segid, self.elem]
         string = "{:6s}{:5d} {:^4s} {:^4s}{:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}{:>10s}  {:<3s}\n".format(*line)
+               # "****  NNNNN xxxxI "
         return string
 
     def _update_crd(self):
@@ -330,7 +335,9 @@ class AtomData:
         '''
         at this moment super rudimentary, but just want to be able to ID if it is protein or not protein. 
         ff (str) : can be 'guess', which means just go off of _cannonical() which is hard coded
-                   ff can also be a path to a force field folder that contains an aminoacids.rtp file
+                   ff can also be: 
+                    1) a path to a force field folder that contains .rtp files
+                    2) a path to a specific .rtp file
         '''
         if ff == 'guess':
             if self.residue_name in self._cannonical:
@@ -338,11 +345,20 @@ class AtomData:
             else:
                 return 'other'
         else:
-            if self._in_rtp(os.path.join(ff, 'aminoacids.rtp')):
-                return 'protein'
-            else:
+            if os.path.isdir(ff):
+                if os.path.isfile(os.path.join(ff, 'aminoacids.rtp')):
+                    if self._in_rtp(os.path.join(ff, 'aminoacids.rtp')):
+                        return 'protein'
                 for file in os.listdir(ff):
                     if file.endswith('rtp'):
                         if self._in_rtp(os.path.join(ff, file)):
                             return os.path.splitext(file)[0]
                 return 'other'
+            elif os.path.isfile(ff):
+                if self._in_rtp(ff):
+                    return True
+                else:
+                    return False
+            else:
+                raise ValueError('dont know!!! RIP')
+            return 'other'

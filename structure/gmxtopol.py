@@ -286,6 +286,10 @@ class Molecule:
         self.atoms = []
         if self.include is not None:
             self.atoms = self._get_atoms()
+        self.residues = self._get_residues()
+
+    def __len__(self):
+        return len(self.atoms)
 
     def _get_include(self):
         for include in self.parent.included:
@@ -295,7 +299,32 @@ class Molecule:
     def _get_atoms(self):
         return self.parent.parse_atoms(self.include, check_moleculetype=False)
 
-    
+    def _get_residues(self):
+        residues = []
+        atom_list = []
+        last_residue_number = 1
+        for atom in self.atoms:
+            if atom.residue_number != last_residue_number:
+                residues.append(Residue(atom_list))
+                atom_list = []
+            else:
+                atom_list.append(atom)
+            last_residue_number = atom.residue_number
+        if len(atom_list) > 0:
+            residues.append(Residue(atom_list))
+        
+        return residues
+
+class Residue:
+
+    def __init__(self, atoms=[], **kwargs):
+        self.atoms = atoms 
+        if len(self.atoms) > 0:
+            self.number= self.atoms[0].residue_number
+            self.name = self.atoms[0].residue_name
+        else:
+            self.number = None
+            self.name = None
 
 
 

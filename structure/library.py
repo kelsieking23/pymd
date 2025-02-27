@@ -15,7 +15,7 @@ def neg_charged():
     return ['ASP', 'GLU']
 
 def polar():
-    return ['SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS', 'HSD']
+    return ['SER', 'THR', 'ASN', 'GLN', 'CYS', 'HIS', 'HSD', 'HSE']
 
 def hydrophobic():
     return ['ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP', 'GLY', 'PRO']
