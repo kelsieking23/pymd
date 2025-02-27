@@ -6,8 +6,9 @@ from argparse import RawTextHelpFormatter
 
 class Ndx:
 
-    def __init__(self, gro=None, peptides=1, ndxt=None, ligands=None):
+    def __init__(self, gro=None, ndx=None, types = {}, peptides=1, ndxt=None, ligands=None):
         self.gro = gro
+        self.ndx = ndx
         # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
@@ -16,7 +17,7 @@ class Ndx:
             self.types = self.getTypes(self.ndxt_groups, ligands)
             self.ext = os.path.splitext(self.gro)[1][1:]
         else:
-            self.types = {}
+            self.types = types
             self.ext = None
         # self.topology = Topology(gro)
         # self.types = {}
