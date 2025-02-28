@@ -256,10 +256,11 @@ class System:
         average_dist = {}
         for ligand in self.ligands:
             average_dist[ligand.name] = {}
-            for res_id in self.protein.ids:
-                average_dist[ligand.name][res_id] = []
-                res_com = self.protein.coms[res_id]
-                for coord in ligand.coordinates:
+            for residue in self.protein.residues:
+                res_id = residue.id
+                average_dist[ligand.name][residue.id] = []
+                res_com = residue.com
+                for coord in ligand.coordinates.values():
                     d = np.sqrt((coord[0] - res_com[0])**2 + (coord[1] - res_com[1])**2 + (coord[2] - res_com[2])**2)
                     average_dist[ligand.name][res_id].append(d)
                 average_dist[ligand.name][res_id] = sum(average_dist[ligand.name][res_id]) / len(average_dist[ligand.name][res_id])
