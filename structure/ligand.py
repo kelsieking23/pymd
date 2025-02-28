@@ -6,6 +6,7 @@
 ####################################################################################################################
 import os
 import numpy as np
+from pymd.structure.structure_file import StructureFile, AtomData
 
 
 class Ligand:
@@ -56,27 +57,18 @@ class Ligand:
         model_coordinates = {}
         ligand_coordinates = []
         current_model = None
-        f = open(self.structure, 'r')
-        for line in f:
-            line_parts = line.split()
-            if 'HETATM' in line_parts[0]:
-                if ignh == True:
-                    atom_type = line_parts[-1][0]
-                    if atom_type == 'H':
-                        continue
-                if line_parts[4].isalpha():
-                    coords = list(map(float, line_parts[6:9]))
-                else:
-                    coords = list(map(float, line_parts[5:8]))                    
-                ligand_coordinates.append(coords)
-            if 'MODEL' in line:
-                current_model = line.strip()
-                if current_model not in model_coordinates.keys():
-                    model_coordinates[current_model] = []
-            if 'ENDMDL' in line:
-                model_coordinates[current_model] = ligand_coordinates
-                ligand_coordinates = []
-        f.close()
+        sf = StructureFile(self.structure)
+        for line in sf.read():
+            if isinstance(line, AtomData):
+                ligand_coordinates = [line.x, line.y, line.z]
+            else:
+                if 'MODEL' in line:
+                    current_model = line.strip()
+                    if current_model not in model_coordinates.keys():
+                        model_coordinates[current_model] = []
+                if 'ENDMDL' in line:
+                    model_coordinates[current_model] = ligand_coordinates
+                    ligand_coordinates = []
         if model_coordinates != {}:
             return model_coordinates
         else:
@@ -142,21 +134,11 @@ class Ligand:
         atom_coords = {}
         self.atoms = []
         atom_types = ('ATOM', 'HETATM')
-        for line in data:
-            line_parts = line.split()
-            if not line.startswith(atom_types):
-                continue
-                # line_parts = self.convertGroLine(line)
-            if len(line_parts) > 0:
-                atom_num = int(line_parts[1])
-                if line_parts[4].isalpha():
-                    atom_coords[atom_num] = list(map(float, line_parts[6:9]))
-                else:
-                    atom_coords[atom_num] = list(map(float, line_parts[5:8]))
-            else:
-                continue
-            if line.startswith(atom_types):
-                self.atoms.append(Atom(line_parts, self))
+        sf = StructureFile(self.structure)
+        for line in sf.read():
+            atom_num = line.atom_number
+            coords = [line.x, line.y, line.z]
+            atom_coords[atom_num] = coords
         return atom_coords
     
     def getAtomTypes(self):
@@ -256,39 +238,10 @@ class Ligand:
             return(len(self.coordinates))
         if heavy == True:
             atoms = 0
-            if self.covalent_id is not None:
-                f = open(self.structure, 'r')
-                for line in f:
-                    line_parts = line.split()
-                    if 'HETATM' in line_parts[0]:
-                        residue_name = line_parts[3]
-                        if line_parts[4].isalpha():
-                            residue_number = line_parts[5]
-                        else:
-                            residue_number = line_parts[4]
-                        residue_id = residue_name + residue_number
-                        if residue_id == self.covalent_id:
-                            atom_type = line_parts[-1][0]
-                            if atom_type == 'H':
-                                continue
-                            else:
-                                atoms += 1
-                    if 'ENDMDL' in line_parts:
-                        break
-                f.close()
-            else:
-                f = open(self.structure, 'r')
-                for line in f:
-                    line_parts = line.split()
-                    if 'HETATM' in line_parts[0]:
-                        atom_type = line_parts[-1][0]
-                        if atom_type == 'H':
-                            continue
-                        else:
-                            atoms += 1
-                    if 'ENDMDL' in line_parts:
-                        break
-                f.close()
+            sf = StructureFile(self.structure)
+            for line in sf.read():
+                if (not line.elem == 'H'):
+                    atoms += 1
         return atoms
 
     @staticmethod
