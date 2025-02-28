@@ -129,11 +129,12 @@ class System:
         Returns: DataFrame of interaction matrix. 
         '''
         interactions = {}
+        residue_coms = self.protein.getResidueCOM()
         for ligand in self.ligands:
             interactions[ligand.name] = {}
             num_interactions = 0
             for res_id in self.protein.ids:
-                res_com = self.protein.coms[res_id]
+                res_com = residue_coms[res_id]
                 for atom in ligand.atoms:
                     d = np.sqrt((atom.coordinates[0] - res_com[0])**2 + (atom.coordinates[1] - res_com[1])**2 + (atom.coordinates[2] - res_com[2])**2)
                     if d <= distance:

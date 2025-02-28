@@ -82,6 +82,8 @@ class Protein:
             self.structure = self.groHandler()
         self.residues = self.getResidues()
         self.ids = [residue.id for residue in self.residues]
+        # self.masses = self.getResidueMasses()
+        # self.coordinates = [residue.coordinate for residue in self.residues]
         # self.structure = self.checkChainID()
         # get residue data
         '''
@@ -559,23 +561,20 @@ class Protein:
         ** Returns: dict, where key = residue_id, and value = xyz coordinates of COM (tuple)
         '''
         residue_coms = {}
-        for residue_id in self.ids:
-            residue_coordinates = self.coordinates[residue_id]
-            residue_mass = self.masses[residue_id]
+        for i, residue_id in enumerate(self.ids):
+            residue = self.residues[i]
+            residue_coordinates = [atom.coordinates for atom in residue.atoms]
             x = []
             y = []
             z = []
             i = 0
-            for coordinate in residue_coordinates:
-                atom_type = self.atom_types[residue_id][i][1]
-                mass = self.atomic_masses[atom_type]
-                x.append(coordinate[0] * mass)
-                y.append(coordinate[1] * mass)
-                z.append(coordinate[2]* mass)
-                i += 1
-            com_x = sum(x) / residue_mass
-            com_y = sum(y) / residue_mass
-            com_z = sum(z) / residue_mass
+            for atom in residue.atoms:
+                x.append(atom.coordinates[0] * atom.mass)
+                y.append(atom.coordinates[1] * atom.mass)
+                z.append(atom.coordinates[2] * atom.mass)
+            com_x = sum(x) / residue.mass
+            com_y = sum(y) / residue.mass
+            com_z = sum(z) / residue.mass
             com = (com_x, com_y, com_z)
             residue_coms[residue_id] = com
         return residue_coms
@@ -782,10 +781,9 @@ class Residue:
         y = []
         z = []
         for atom in self.atoms:
-            mass = self.atomic_masses[atom.type]
-            x.append(atom.coordinates[0] * mass)
-            y.append(atom.coordinates[1] * mass)
-            z.append(atom.coordinates[2]* mass)
+            x.append(atom.coordinates[0] * self.mass)
+            y.append(atom.coordinates[1] * self.mass)
+            z.append(atom.coordinates[2]* self.mass)
         com_x = sum(x) / self.mass
         com_y = sum(y) / self.mass
         com_z = sum(z) / self.mass
@@ -821,7 +819,16 @@ class Atom:
             self.hbond = True
         else:
             self.hbond = False
-
+        self.atomic_masses = {
+            'C':12.011,
+            'A':12.011,
+            'N':14.007,
+            'H':1.008,
+            'O':15.999,
+            'S':32.06,
+            'P':30.974
+        }
+        self.mass = self.atomic_masses[self.type]
 # path = os.path.abspath('../mdanalysis/test/md_500_600.gro')
 # print(os.path.dirname(path))
 # pro = Protein(os.path.abspath('../mdanalysis/test/md_500_600.gro'), ligands='MYR', ignore=['ACE', 'NH2'])
