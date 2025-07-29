@@ -9,20 +9,15 @@ class Ndx:
     def __init__(self, gro=None, ndx=None, types = {}, peptides=1, ndxt=None, ligands=None):
         self.gro = gro
         self.ndx = ndx
-        # self.peptides= peptides
         self.ndxt_groups = ndxt
         if ndxt is not None:
             self.ndxt_groups = self.parseNDXT(ndxt)
         if self.gro is not None:
-            self.types = self.getTypes(self.ndxt_groups, ligands)
             self.ext = os.path.splitext(self.gro)[1][1:]
+            self.types = self.getTypes(self.ndxt_groups, ligands)
         else:
             self.types = types
             self.ext = None
-        # self.topology = Topology(gro)
-        # self.types = {}
-        # for key in types.keys():
-        #     self.types[key] = Type(key, types[key])
         self.selections = {}
 
     @classmethod

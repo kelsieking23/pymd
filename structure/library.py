@@ -4,6 +4,27 @@ warnings.filterwarnings('ignore')
 import pandas as pd
 from pymd import dir_path
 
+kyte_doolittle_dict = {
+        'ILE':0,
+        'VAL':0,
+        'LEU':1,
+        'PHE':2,
+        'CYS':2,
+        'MET':2,
+        'ALA':2,
+        'GLY':3,
+        'THR':3,
+        'SER':3,
+        'TRP':3,
+        'TYR':3,
+        'PRO':3,
+        'HIS':4,
+        'ASN':4,
+        'GLN':4,
+        'ASP':4,
+        'GLU':4,
+        'LYS':4,
+}
 
 def charged():
     return ['ARG', 'LYS', 'ASP', 'GLU']
@@ -41,7 +62,7 @@ def propdict():
         'THR':'p',
         'SER':'p',
         'TRP':'h,a',
-        'TYR':'h,a',
+        'TYR':'h,a,p',
         'PRO':'h',
         'HIS':'p',
         'ASN':'p',

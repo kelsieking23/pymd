@@ -19,7 +19,7 @@ import mdtraj
 import warnings
 warnings.filterwarnings('ignore')
 # sys.path.append('D:/Work/')
-from mdanalysis.rmsd_old import RMSD
+# from mdanalysis.rmsd_old import RMSD
 # from pymd.mdanalysis.ndx import Ndx
 from pymd.utilities.rewritepdb import writePDB
 from pymd.structure.protein import Protein
