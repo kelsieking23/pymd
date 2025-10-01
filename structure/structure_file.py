@@ -13,8 +13,15 @@ class StructureFile:
             self.ext = ext[1:]
             if self.ext != 'gro':
                 self.atoms = [atom for atom in self.read()]
+            else:
+                self.atoms = [atom for atom in self.gro()]
+                try:
+                    self.box = self.get_box(self.inp)
+                except:
+                    self.box = [0.0,0.0,0.0]
         else:
             self.ext = None
+
         # self.atoms = [atom for atom in self.read()]
 
     def _structureReader(self):
@@ -25,8 +32,24 @@ class StructureFile:
     def _atomDataIterator(self):
         for atom in self.atoms:
             yield atom
-        return self.atoms
 
+        return self.atoms
+    @staticmethod
+    def get_box(gro):
+        '''
+        Get box coordinates at end of input .gro file
+        
+        Parameters:
+        - gro (str, path-like, file-like): path to .gro file
+
+        Returns:
+        (np.ndarray) Box lengths as a numpy array
+        '''
+        with open(gro, 'r') as f:
+            contents = f.readlines()
+            boxstring = contents[-1].strip('\n').strip()
+        return list(map(float, boxstring.split()))
+    
     def read(self):
         '''
         Iterates through structure file and yeilds lines.
@@ -35,15 +58,19 @@ class StructureFile:
             return self._atomDataIterator()
         if self.ext == 'pdb':
             return self.pdb()
+        if self.ext == 'gro':
+            return self.gro()
 
 
-    def write(self, out):
+    def write(self, out, **kwargs):
         if self.ext == None:
             ext = os.path.splitext(out)[1][1:]
         else:
             ext = self.ext 
         if ext == 'pdb':
             self.write_pdb(self.atoms, out)
+        if ext == 'gro':
+            self.write_gro(self.atoms, out, box=self.box, **kwargs)
     def get_atom_data_pdb(self, line):
         pass
     
@@ -158,29 +185,33 @@ class StructureFile:
                 i += 1
                 continue
             try:
-                residue_number = int(line[0:5].strip())
-                residue_name = line[5:10].strip()
-                atom_name = line[10:15].strip()
-                atom_number = int(line[15:20].strip())
-                residue_id = '{}{}'.format(residue_name, residue_number)
-                x = float(line[20:29].strip())
-                y = float(line[29:37].strip())
-                z = float(line[37:46].strip())
-                if (len(line) > 45):
-                    vx = float(line[46:53].strip())
-                    vy = float(line[53:61].strip())
-                    vz = float(line[61:].strip())
-                else:
-                    vx = 0.0
-                    vy = 0.0
-                    vz = 0.0
-                atom = GroAtomData(atom_number, atom_index, atom_name, residue_name, residue_id,
-                                   residue_number, residue_index, x, y, z, vx, vy, vz, line)
-                atom_index += 1
-                residue_index += 1
-                yield atom
+                list(map(float, line.strip('\n').strip().split()))
+                break
             except:
                 pass
+            residue_number = int(line[0:5].strip())
+            residue_name = line[5:10].strip()
+            atom_name = line[10:15].strip()
+            atom_number = int(line[15:20].strip())
+            residue_id = '{}{}'.format(residue_name, residue_number)
+            x = float(line[20:29].strip())
+            y = float(line[29:37].strip())
+            z = float(line[37:45].strip())
+            if (len(line) > 45):
+                vx = float(line[46:53].strip())
+                vy = float(line[53:61].strip())
+                vz = float(line[61:].strip())
+            else:
+                vx = 0.0
+                vy = 0.0
+                vz = 0.0
+            atom = GroAtomData(atom_number, atom_index, atom_name, residue_name, residue_id,
+                                residue_number, residue_index, x, y, z, vx, vy, vz, line)
+            atom_index += 1
+            residue_index += 1
+            yield atom
+            # except:
+            #     pass
             i += 1
         return atoms
 
